@@ -2,13 +2,15 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { LogBox } from "react-native";
+import { useFonts } from "expo-font";
+import { StatusBar } from "expo-status-bar";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 
-
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
-LogBox.ignoreAllLogs(true)
+LogBox.ignoreAllLogs(true);
 
 // Keep the native splash visible from cold start until icon fonts register.
 // Required because @expo/vector-icons' componentDidMount fallback fires
@@ -18,16 +20,30 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
+  const [fontsLoaded, fontsError] = useFonts({
+    "BarlowCondensed-Bold": require("../assets/fonts/BarlowCondensed-Bold.ttf"),
+    "BarlowCondensed-SemiBold": require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
+    "Satoshi-Medium": require("../assets/fonts/Satoshi-Medium.ttf"),
+    "Satoshi-Bold": require("../assets/fonts/Satoshi-Bold.ttf"),
+  });
+
+  const iconsReady = loaded || error;
+  const textReady = fontsLoaded || fontsError;
 
   useEffect(() => {
-    if (loaded || error) {
+    if (iconsReady && textReady) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [iconsReady, textReady]);
 
   // If the CDN is unreachable we fall through on error rather than wedging
   // the app — icons will tofu, but the app still boots.
-  if (!loaded && !error) return null;
+  if (!iconsReady || !textReady) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <KeyboardProvider>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0A0A0C" } }} />
+    </KeyboardProvider>
+  );
 }
