@@ -304,7 +304,7 @@ export default function HomeScreen() {
           <MetricCard
             icon="map"
             color={colors.brand}
-            label="Distance"
+            label="Dist"
             value={distanceKm}
             unit="km"
           />
