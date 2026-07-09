@@ -35,11 +35,17 @@ export function usePedometer(onDelta: (delta: number) => void) {
 
         sub = Pedometer.watchStepCount((result) => {
           const prev = lastCount.current;
-          lastCount.current = result.steps;
-          if (prev !== null && result.steps > prev) {
+          if (prev === null) {
+            // First callback: establish baseline only.
+            // On Android TYPE_STEP_COUNTER returns steps since device boot (can be huge).
+            // On iOS it returns steps since subscription start.
+            // Either way we never emit on the first callback — just set the baseline.
+            lastCount.current = result.steps;
+            return;
+          }
+          if (result.steps > prev) {
             onDeltaRef.current(result.steps - prev);
-          } else if (prev === null && result.steps > 0) {
-            onDeltaRef.current(result.steps);
+            lastCount.current = result.steps;
           }
         });
       } catch {

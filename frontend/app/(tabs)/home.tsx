@@ -55,15 +55,27 @@ export default function HomeScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showPermExplainer, setShowPermExplainer] = useState(false);
 
   const deviceIdRef = useRef("");
   const pendingRef = useRef(0);
+  const goalRef = useRef(10000);           // goal stored in ref so onDelta can read it
+  const goalCelebrated = useRef(false);   // track if we've fired the goal haptic today
 
   // ─── Pedometer ───────────────────────────────────────────────────────
   const onDelta = useCallback((delta: number) => {
     pendingRef.current += delta;
-    setLocalSteps((p) => p + delta);
-  }, []);
+    setLocalSteps((prev) => {
+      const next = prev + delta;
+      const currentGoal = goalRef.current;
+      // Fire goal celebration haptic exactly once per day when goal is first crossed
+      if (!goalCelebrated.current && next >= currentGoal && currentGoal > 0) {
+        goalCelebrated.current = true;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      return next;
+    });
+  }, []); // refs are stable — no deps needed
 
   const { available, permission, requestPermission } = usePedometer(onDelta);
 
@@ -87,10 +99,17 @@ export default function HomeScreen() {
         apiGet<DayMetrics>(`/steps/${deviceId}/day/${today}`),
         apiGet<AchieveSummary>(`/achievements/${deviceId}`),
       ]);
-      if (pRes.status === "fulfilled") setProfile(pRes.value);
+      if (pRes.status === "fulfilled") {
+        setProfile(pRes.value);
+        goalRef.current = pRes.value.step_goal ?? 10000;
+      }
       if (mRes.status === "fulfilled") {
-        setLocalSteps(mRes.value.steps);
+        const apiSteps = mRes.value.steps;
+        const apiGoal = goalRef.current;
+        setLocalSteps(apiSteps);
         pendingRef.current = 0;
+        // If goal was already met before app opened, mark celebrated to prevent spurious haptic
+        goalCelebrated.current = apiSteps >= apiGoal;
       }
       if (aRes.status === "fulfilled") setAchieve(aRes.value);
     } catch {}
@@ -158,9 +177,20 @@ export default function HomeScreen() {
   async function handleEnablePedo() {
     if (permission === "blocked") {
       Linking.openSettings();
-    } else {
-      await requestPermission();
+      return;
     }
+    if (permission === "undetermined") {
+      // Show in-app explainer first (before triggering native dialog)
+      setShowPermExplainer(true);
+      return;
+    }
+    // "denied" with canAskAgain — directly request again
+    await requestPermission();
+  }
+
+  async function confirmPermRequest() {
+    setShowPermExplainer(false);
+    await requestPermission();
   }
 
   // ─── Loading ──────────────────────────────────────────────────────────
@@ -191,8 +221,40 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Permission Banner */}
-        {showPermBanner && (
+        {/* Pre-permission Explainer (shown before native dialog) */}
+        {showPermExplainer && (
+          <View style={s.explainerCard}>
+            <View style={s.explainerHeader}>
+              <View style={s.explainerIconBg}>
+                <Ionicons name="footsteps" size={22} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.explainerTitle}>Enable Step Tracking</Text>
+                <Text style={s.explainerBody}>
+                  AeroStep uses your phone's motion sensor to count steps in real time — no GPS, no battery drain.
+                </Text>
+              </View>
+            </View>
+            <View style={s.explainerActions}>
+              <TouchableOpacity
+                style={s.explainerSkip}
+                onPress={() => setShowPermExplainer(false)}
+              >
+                <Text style={s.explainerSkipTxt}>Not Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.explainerConfirm}
+                onPress={confirmPermRequest}
+                testID="perm-confirm"
+              >
+                <Text style={s.explainerConfirmTxt}>Allow Tracking →</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Compact Permission Banner (denied / blocked) */}
+        {showPermBanner && !showPermExplainer && (
           <TouchableOpacity
             style={s.permBanner}
             onPress={handleEnablePedo}
@@ -203,7 +265,9 @@ export default function HomeScreen() {
             <Text style={s.permText}>
               {permission === "blocked"
                 ? "Open Settings to enable step tracking"
-                : "Enable step tracking for live counts"}
+                : permission === "undetermined"
+                ? "Tap to enable live step counting"
+                : "Step tracking was denied — tap to retry"}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={colors.brand} />
           </TouchableOpacity>
@@ -233,7 +297,7 @@ export default function HomeScreen() {
           <MetricCard
             icon="flame"
             color={colors.warning}
-            label="Calories"
+            label="Cals"
             value={calories.toString()}
             unit="kcal"
           />
@@ -247,7 +311,7 @@ export default function HomeScreen() {
           <MetricCard
             icon="timer-outline"
             color={colors.success}
-            label="Active Min"
+            label="Active"
             value={activeMin.toString()}
             unit="min"
           />
@@ -442,6 +506,64 @@ const s = StyleSheet.create({
     borderColor: colors.brand + "40",
   },
   permText: { flex: 1, fontFamily: fonts.text, fontSize: 13, color: colors.brand },
+  explainerCard: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.brand + "50",
+    padding: 16,
+    marginBottom: 16,
+  },
+  explainerHeader: { flexDirection: "row", gap: 14, marginBottom: 16 },
+  explainerIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.brandTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  explainerTitle: {
+    fontFamily: fonts.textBold,
+    fontSize: 15,
+    color: colors.onSurface,
+    marginBottom: 4,
+  },
+  explainerBody: {
+    fontFamily: fonts.text,
+    fontSize: 13,
+    color: colors.onSurfaceSecondary,
+    lineHeight: 18,
+  },
+  explainerActions: { flexDirection: "row", gap: 10 },
+  explainerSkip: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  explainerSkipTxt: {
+    fontFamily: fonts.text,
+    fontSize: 14,
+    color: colors.onSurfaceSecondary,
+  },
+  explainerConfirm: {
+    flex: 2,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  explainerConfirmTxt: {
+    fontFamily: fonts.textBold,
+    fontSize: 14,
+    color: colors.onBrand,
+  },
   hero: { alignItems: "center", paddingVertical: 20 },
   ringInner: { alignItems: "center" },
   stepCount: {
