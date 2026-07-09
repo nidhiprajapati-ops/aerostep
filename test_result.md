@@ -101,3 +101,198 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Build a mobile app for pedometer and fitness tracking with configurable features based on user health, age, etc. Features: Device pedometer sensor, age/weight/height/gender profile, daily/weekly stats with charts, streaks, calorie burn, distance, active minutes, achievements/badges, AI personalized fitness tips with Emergent LLM key. Design: Game style, iOS SaaS app aesthetic (7 Dark-First Utility personality)."
+
+backend:
+  - task: "FastAPI server health check"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Server created with all endpoints: profile CRUD, steps sync, achievements, AI coach"
+
+  - task: "Profile create/update endpoint (POST /api/profile)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint calculates step_goal, calorie_goal, bmr from profile data using Mifflin-St Jeor formula"
+
+  - task: "Get profile endpoint (GET /api/profile/{device_id})"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Returns 404 if no profile found"
+
+  - task: "Steps sync endpoint (POST /api/steps)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Supports both increment and set modes, returns computed day metrics"
+
+  - task: "Steps history endpoint (GET /api/steps/{device_id}/history)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Returns days array and summary with avg, best_day, goal_met_days, distance, calories"
+
+  - task: "Achievements endpoint (GET /api/achievements/{device_id})"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Returns current_streak, best_streak, total_steps, badges array with unlocked status"
+
+  - task: "AI Coach endpoint (POST /api/ai/coach)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Uses Emergent LLM key with gpt-5.4 to generate 3 personalized tips. Caches per device+date."
+
+frontend:
+  - task: "App loads and shows loading spinner"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "index.tsx checks profile_complete in storage, redirects to onboarding or home"
+
+  - task: "Onboarding screen - profile setup form"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/onboarding.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Full form: name, gender pills, age/weight/height inputs, activity level pills, health conditions multi-select. Saves to backend and navigates to home."
+
+  - task: "Home dashboard screen with progress ring"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/home.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Glass header, 240px progress ring, 4 metric cards (calories, distance, active min, streak), AI coach card with refresh. Pedometer permission handling per handle_permissions_contract."
+
+  - task: "Stats screen with SVG bar chart"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/stats.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "7D/30D toggle, custom SVG bar chart with goal dashed line, summary 2x2 cards, daily breakdown list"
+
+  - task: "Awards screen with streak card and badge grid"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/awards.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Streak featured card with background image + LinearGradient scrim, lifetime steps card, 3-column badge grid with haptic feedback"
+
+  - task: "Profile screen with editable form"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Pre-filled profile form, goals display card, pill selectors for gender/activity/conditions, save with recalculation"
+
+  - task: "Tab navigation between all 4 screens"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/_layout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Glass blur tab bar with Today/Stats/Awards/Profile tabs"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "App loads and shows loading spinner"
+    - "Onboarding screen - profile setup form"
+    - "Home dashboard screen with progress ring"
+    - "Stats screen with SVG bar chart"
+    - "Awards screen with streak card and badge grid"
+    - "Profile screen with editable form"
+    - "Tab navigation between all 4 screens"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "All 5 screens created: onboarding.tsx, home.tsx, stats.tsx, awards.tsx, profile.tsx. Backend was already complete from previous session. app.json updated with pedometer permissions (NSMotionUsageDescription for iOS, ACTIVITY_RECOGNITION for Android). Please test: 1) App loads and redirects to onboarding (first time) 2) Profile creation form works and saves to backend 3) Home dashboard shows step count ring and metric cards 4) Stats page shows bar chart 5) Awards page shows streak card and badges 6) Profile page shows pre-filled form with goals. Device ID is auto-generated and stored in AsyncStorage."

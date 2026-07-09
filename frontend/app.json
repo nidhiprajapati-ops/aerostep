@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.fitpace.m78wka"
+      "bundleIdentifier": "com.emergent.fitpace.m78wka",
+      "infoPlist": {
+        "NSMotionUsageDescription": "Track daily steps and reach your fitness goals"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,10 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.fitpace.m78wka"
+      "package": "com.emergent.fitpace.m78wka",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
     },
     "web": {
       "bundler": "metro",
