@@ -361,7 +361,7 @@ async def ai_coach(body: CoachIn):
             "Reply with exactly 3 short, personalized, actionable tips as bullet points (each under 20 words). "
             "No headers, no intro, no outro. Use plain text bullets starting with '•'. Be motivating and specific to the data."
         ),
-    ).with_model("openai", "gpt-5.4")
+    ).with_model("openai", "gpt-4o")
     msg = UserMessage(
         text=(
             f"User: {profile.name}, age {profile.age}, {profile.gender}, {profile.weight_kg}kg, {profile.height_cm}cm. "
