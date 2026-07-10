@@ -190,7 +190,7 @@ export default function HomeScreen() {
         device_id: deviceIdRef.current,
         date: todayStr(),
         refresh,
-      });
+      }, controller.signal);
       setAiTip(res.tip);
     } catch {
       // Show a friendly fallback so the section is never empty
