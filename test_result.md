@@ -128,6 +128,9 @@ backend:
       - working: "NA"
         agent: "main"
         comment: "Endpoint calculates step_goal, calorie_goal, bmr from profile data using Mifflin-St Jeor formula"
+      - working: false
+        agent: "user"
+        comment: "User reported Create My Profile is taking too long. Optimizing the persistence path and retesting end-to-end."
 
   - task: "Get profile endpoint (GET /api/profile/{device_id})"
     implemented: true
@@ -213,6 +216,9 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "Full form: name, gender pills, age/weight/height inputs, activity level pills, health conditions multi-select. Saves to backend and navigates to home."
+      - working: false
+        agent: "user"
+        comment: "User reported slow profile submission. Added device ID preloading, a six-second request limit, clearer saving feedback, and removed duplicate AI prefetch."
 
   - task: "Home dashboard screen with progress ring"
     implemented: true
@@ -282,6 +288,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Create My Profile submission speed and successful navigation"
     - "App loads and shows loading spinner - then navigates to onboarding"
     - "Onboarding screen renders and form submission works"
     - "Home dashboard screen with progress ring"

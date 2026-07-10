@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, fonts } from "@/src/theme";
-import { apiPost, apiGet, getDeviceId, todayStr } from "@/src/api";
+import { apiPost, apiGet, getDeviceId } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 
 const GENDERS = [
@@ -53,12 +53,13 @@ export default function OnboardingScreen() {
   const [conditions, setConditions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const deviceIdRef = useRef("");
 
   // Pre-warm the HTTPS connection so the first real request (POST /profile)
   // doesn't pay the TLS-handshake tax (~1-3s on mobile cold start).
   useEffect(() => {
     apiGet("/health").catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    getDeviceId().then((id) => { deviceIdRef.current = id; }).catch(() => {});
   }, []);
 
   function toggleCondition(key: string) {
@@ -78,8 +79,11 @@ export default function OnboardingScreen() {
     setError(null);
     setSaving(true);
     try {
-      const deviceId = await getDeviceId();
-      await apiPost("/profile", {
+      const deviceId = deviceIdRef.current || await getDeviceId();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      try {
+        await apiPost("/profile", {
         device_id: deviceId,
         name: name.trim(),
         gender,
@@ -87,14 +91,16 @@ export default function OnboardingScreen() {
         weight_kg: weightNum,
         height_cm: heightNum,
         activity_level: activity,
-        health_conditions: conditions,
-      });
+          health_conditions: conditions,
+        }, controller.signal);
+      } finally {
+        clearTimeout(timer);
+      }
       await storage.setItem("profile_complete", true);
-      // Pre-warm AI coach cache — fire & forget so home loads tip instantly.
-      apiPost("/ai/coach", { device_id: deviceId, date: todayStr(), refresh: false }).catch(() => {});
       router.replace("/(tabs)/home");
     } catch (e: any) {
-      setError(e.message || "Failed to save. Please try again.");
+      const timedOut = e?.name === "AbortError";
+      setError(timedOut ? "Saving timed out. Check your connection and try again." : e.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -250,7 +256,7 @@ export default function OnboardingScreen() {
       </View>
 
       {/* Error */}
-      {error ? <Text style={s.error}>{error}</Text> : null}
+      {error ? <Text style={s.error} testID="profile-save-error">{error}</Text> : null}
 
       {/* CTA */}
       <TouchableOpacity
@@ -261,7 +267,10 @@ export default function OnboardingScreen() {
         activeOpacity={0.85}
       >
         {saving ? (
-          <ActivityIndicator color={colors.onBrand} />
+          <View style={s.savingRow} testID="profile-saving-status">
+            <ActivityIndicator color={colors.onBrand} />
+            <Text style={s.savingTxt}>Saving…</Text>
+          </View>
         ) : (
           <Text style={s.ctaTxt}>Create My Profile →</Text>
         )}
@@ -355,4 +364,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   ctaTxt: { fontFamily: fonts.display, fontSize: 20, color: colors.onBrand, letterSpacing: 1 },
+  savingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  savingTxt: { fontFamily: fonts.textBold, fontSize: 14, color: colors.onBrand },
 });

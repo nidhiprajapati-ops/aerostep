@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, BeforeValidator
 from typing import List, Optional, Annotated
 from datetime import datetime, timezone, timedelta
+from pymongo import ReturnDocument
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -231,22 +232,22 @@ async def upsert_profile(body: ProfileIn):
     step_goal, calorie_goal, bmr = compute_goals(
         body.age, body.gender, body.weight_kg, body.height_cm, body.activity_level, body.health_conditions
     )
-    existing = await db.profiles.find_one({"device_id": body.device_id})
-    profile = Profile(
+    now = utcnow_iso()
+    data = {
         **body.model_dump(),
-        step_goal=step_goal,
-        calorie_goal=calorie_goal,
-        bmr=bmr,
+        "step_goal": step_goal,
+        "calorie_goal": calorie_goal,
+        "bmr": bmr,
+        "updated_at": now,
+    }
+    saved = await db.profiles.find_one_and_update(
+        {"device_id": body.device_id},
+        {"$set": data, "$setOnInsert": {"created_at": now}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0},
     )
-    data = profile.to_mongo()
-    if existing:
-        data["created_at"] = existing.get("created_at", data["created_at"])
-        data["updated_at"] = utcnow_iso()
-        await db.profiles.update_one({"device_id": body.device_id}, {"$set": data})
-    else:
-        await db.profiles.insert_one(data)
-    saved = await get_profile_doc(body.device_id)
-    return saved.model_dump(exclude={"id"})
+    return Profile.model_validate(saved).model_dump(exclude={"id"})
 
 
 @api_router.get("/profile/{device_id}")

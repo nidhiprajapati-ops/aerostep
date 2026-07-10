@@ -18,6 +18,7 @@ Dark-first iOS SaaS fitness tracker with native pedometer, BLE device integratio
 - Fields: Name, Gender, Age, Weight (kg), Height (cm), Activity Level, Health Conditions
 - Auto-calculates daily step goal and calorie goal via backend
 - Device ID auto-generated and persisted in AsyncStorage
+- Profile submission uses a single database round trip with bounded client waiting
 
 ### 3. BLE Integration (Native Build Only)
 - **Package**: `react-native-ble-plx` v3.5.1
