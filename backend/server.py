@@ -417,6 +417,10 @@ async def ai_coach(body: CoachIn):
     return {"tip": tip, "cached": False}
 
 
+@api_router.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 app.include_router(api_router)
 
 app.add_middleware(
