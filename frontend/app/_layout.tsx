@@ -17,11 +17,18 @@ LogBox.ignoreAllLogs(true);
 // Keep native splash visible until fonts are ready
 SplashScreen.preventAutoHideAsync();
 
-// react-native-keyboard-controller has no web support — skip it on web
-// to prevent a blank screen caused by missing native bindings.
+// react-native-keyboard-controller has no web support, and its native module
+// isn't linked in Expo Go either — both throw at require() time, so fall back
+// to a passthrough view rather than crashing the whole tree on either.
 let KeyboardProvider: React.ComponentType<{ children: React.ReactNode }>;
 if (Platform.OS !== "web") {
-  KeyboardProvider = require("react-native-keyboard-controller").KeyboardProvider;
+  try {
+    KeyboardProvider = require("react-native-keyboard-controller").KeyboardProvider;
+  } catch {
+    KeyboardProvider = ({ children }: { children: React.ReactNode }) => (
+      <View style={{ flex: 1 }}>{children}</View>
+    );
+  }
 } else {
   KeyboardProvider = ({ children }: { children: React.ReactNode }) => (
     <View style={{ flex: 1 }}>{children}</View>
