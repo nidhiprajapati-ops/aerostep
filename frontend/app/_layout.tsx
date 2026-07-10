@@ -1,6 +1,5 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import * as Font from "expo-font";
 import React, { useEffect } from "react";
 import { LogBox, Platform, View } from "react-native";
 import { useFonts } from "expo-font";
@@ -37,26 +36,11 @@ if (Platform.OS !== "web") {
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
-  // FontDisplay.SWAP → CSS font-display:swap on web.
-  // Text renders immediately in a system fallback, then swaps to the custom
-  // font once the .ttf is downloaded. Eliminates FOIT on the web preview.
   const [fontsLoaded, fontsError] = useFonts({
-    "BarlowCondensed-Bold": {
-      uri: require("../assets/fonts/BarlowCondensed-Bold.ttf"),
-      display: Font.FontDisplay.SWAP,
-    },
-    "BarlowCondensed-SemiBold": {
-      uri: require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
-      display: Font.FontDisplay.SWAP,
-    },
-    "Satoshi-Medium": {
-      uri: require("../assets/fonts/Satoshi-Medium.ttf"),
-      display: Font.FontDisplay.SWAP,
-    },
-    "Satoshi-Bold": {
-      uri: require("../assets/fonts/Satoshi-Bold.ttf"),
-      display: Font.FontDisplay.SWAP,
-    },
+    "BarlowCondensed-Bold":    require("../assets/fonts/BarlowCondensed-Bold.ttf"),
+    "BarlowCondensed-SemiBold": require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
+    "Satoshi-Medium":          require("../assets/fonts/Satoshi-Medium.ttf"),
+    "Satoshi-Bold":            require("../assets/fonts/Satoshi-Bold.ttf"),
   });
 
   const iconsReady = loaded || !!error;

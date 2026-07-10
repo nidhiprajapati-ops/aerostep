@@ -1,9 +1,8 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -14,99 +13,45 @@ import Animated, {
   withTiming,
   withSpring,
   withDelay,
-  withSequence,
-  withRepeat,
   runOnJS,
   Easing,
 } from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle } from "react-native-svg";
 
 import { storage } from "@/src/utils/storage";
 import { colors, fonts } from "@/src/theme";
 
-const { width: W, height: H } = Dimensions.get("window");
+const { height: H } = Dimensions.get("window");
 
-// ── Ring constants ────────────────────────────────────────────────────────────
-const RING = 148;
-const STROKE = 3;
-const RADIUS = (RING - STROKE) / 2;
-const CIRC = 2 * Math.PI * RADIUS;
+// ── Ring constants (mirrors home screen ProgressRing) ──────────────────────────
+const RING_SIZE   = 210;
+const STROKE_W    = 14;
+const RADIUS      = (RING_SIZE - STROKE_W) / 2;
+const CIRC        = 2 * Math.PI * RADIUS;
+
+// Target: ring fills to 84.3% representing 8,432 / 10,000 steps
+const TARGET_STEPS      = 8_432;
+const ARC_TARGET        = 0.843;
+const COUNT_DELAY_MS    = 220;
+const COUNT_DURATION_MS = 1_600;
+const EXIT_AT_MS        = 3_300;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// ── Speed-line config ─────────────────────────────────────────────────────────
-const LINES = [
-  { top: H * 0.265, w: W * 0.52, delay: 60,  alpha: 1   },
-  { top: H * 0.300, w: W * 0.74, delay: 130, alpha: 0.7 },
-  { top: H * 0.332, w: W * 0.36, delay: 20,  alpha: 0.5 },
-  { top: H * 0.660, w: W * 0.46, delay: 200, alpha: 0.9 },
-  { top: H * 0.692, w: W * 0.30, delay: 95,  alpha: 0.4 },
-];
-
-// ── SpeedLine (each has its own animated values) ──────────────────────────────
-type LineProps = { top: number; w: number; delay: number; alpha: number };
-
-function SpeedLine({ top, w, delay, alpha }: LineProps) {
-  const tx = useSharedValue(-w);
-  const op = useSharedValue(0);
-
-  useEffect(() => {
-    tx.value = withDelay(
-      delay,
-      withTiming(W + w, { duration: 680, easing: Easing.out(Easing.cubic) })
-    );
-    op.value = withDelay(
-      delay,
-      withSequence(
-        withTiming(alpha, { duration: 120 }),
-        withDelay(380, withTiming(0, { duration: 200 }))
-      )
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateX: tx.value }],
-    opacity: op.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[{ position: "absolute", top, height: 2, left: 0 }, style]}
-    >
-      <LinearGradient
-        colors={["transparent", colors.brand + "55", colors.brand + "33", "transparent"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ width: w, height: 2 }}
-      />
-    </Animated.View>
-  );
-}
-
 // ── Main intro screen ─────────────────────────────────────────────────────────
 export default function Index() {
-  const router = useRouter();
+  const router    = useRouter();
   const navigated = useRef(false);
-  const exiting  = useRef(false);
+  const [displayCount, setDisplayCount] = useState(0);
 
-  // Shared animation values
+  // Reanimated shared values
   const screenOp  = useSharedValue(1);
-  const scanY     = useSharedValue(0);
-  const scanOp    = useSharedValue(0);
   const ringOp    = useSharedValue(0);
-  const ringScale = useSharedValue(0.35);
-  const ringPulse = useSharedValue(1);
-  const arcProg   = useSharedValue(0);     // 0 → 1, drives SVG strokeDashoffset
+  const ringScale = useSharedValue(0.7);
+  const arcProg   = useSharedValue(0);
   const logoOp    = useSharedValue(0);
-  const logoScale = useSharedValue(0.82);
-  const lineW     = useSharedValue(0);     // 0 → LINE_MAX_W (px)
+  const logoY     = useSharedValue(18);
   const tagOp     = useSharedValue(0);
-  const tagY      = useSharedValue(18);
-  const ctaOp     = useSharedValue(0);
-  const ctaScale  = useSharedValue(0.88);
-  const ctaPulse  = useSharedValue(1);
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   const navigate = useCallback(async () => {
@@ -117,322 +62,218 @@ export default function Index() {
   }, [router]);
 
   const doExit = useCallback(() => {
-    if (exiting.current) return;
-    exiting.current = true;
-    screenOp.value = withTiming(0, { duration: 400 }, () => runOnJS(navigate)());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    screenOp.value = withTiming(0, { duration: 380 }, () => runOnJS(navigate)());
+  // screenOp is a stable SharedValue ref — safe to omit
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
+  // ── Step counter animation (JS/RAF side) ─────────────────────────────────────
+  useEffect(() => {
+    let frameId: number;
+    let startTs: number | null = null;
+
+    const tick = (ts: number) => {
+      if (startTs === null) startTs = ts;
+      const elapsed = ts - startTs;
+      const t       = Math.min(elapsed / COUNT_DURATION_MS, 1);
+      const eased   = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setDisplayCount(Math.round(eased * TARGET_STEPS));
+      if (t < 1) frameId = requestAnimationFrame(tick);
+    };
+
+    const delay = setTimeout(() => {
+      frameId = requestAnimationFrame(tick);
+    }, COUNT_DELAY_MS);
+
+    return () => {
+      clearTimeout(delay);
+      cancelAnimationFrame(frameId);
+    };
   }, []);
 
-  // ── Timeline ─────────────────────────────────────────────────────────────────
+  // ── Main timeline ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    // --- 0 ms: scan line sweeps down (system-boot feel) ---
-    scanOp.value = withSequence(
-      withTiming(1, { duration: 180 }),
-      withDelay(900, withTiming(0, { duration: 220 }))
-    );
-    scanY.value = withTiming(H, { duration: 1300, easing: Easing.linear });
+    // 100 ms — ring springs in
+    ringOp.value    = withDelay(100, withTiming(1, { duration: 400 }));
+    ringScale.value = withDelay(100, withSpring(1, { damping: 13, stiffness: 80 }));
 
-    // --- 200 ms: ring springs in ---
-    ringOp.value    = withDelay(200, withTiming(1, { duration: 450 }));
-    ringScale.value = withDelay(200, withSpring(1, { damping: 11, stiffness: 85 }));
-
-    // --- 350 ms: progress arc fills clockwise (1.9 s) ---
-    arcProg.value = withDelay(350, withTiming(1, {
-      duration: 1900,
-      easing: Easing.out(Easing.cubic),
+    // 220 ms — arc fills to 84.3 % in sync with counter
+    arcProg.value = withDelay(COUNT_DELAY_MS, withTiming(ARC_TARGET, {
+      duration: COUNT_DURATION_MS,
+      easing:   Easing.out(Easing.cubic),
     }));
 
-    // --- 850 ms: ring pulses gently after appearing ---
-    ringPulse.value = withDelay(850,
-      withRepeat(
-        withSequence(
-          withTiming(1.055, { duration: 850, easing: Easing.inOut(Easing.sin) }),
-          withTiming(1,     { duration: 850, easing: Easing.inOut(Easing.sin) })
-        ),
-        -1,
-        false
-      )
-    );
+    // 1 100 ms — wordmark slides up + fades in
+    logoOp.value = withDelay(1_100, withTiming(1, { duration: 480 }));
+    logoY.value  = withDelay(1_100, withSpring(0, { damping: 14 }));
 
-    // --- 580 ms: wordmark zooms in ---
-    logoOp.value    = withDelay(580, withTiming(1, { duration: 480 }));
-    logoScale.value = withDelay(580, withSpring(1, { damping: 10, stiffness: 75 }));
+    // 1 680 ms — tagline fades in
+    tagOp.value = withDelay(1_680, withTiming(1, { duration: 420 }));
 
-    // --- 1050 ms: divider line extends ---
-    lineW.value = withDelay(1050, withTiming(200, {
-      duration: 420,
-      easing: Easing.out(Easing.quad),
-    }));
-
-    // --- 1250 ms: tagline slides up ---
-    tagOp.value = withDelay(1250, withTiming(1, { duration: 480 }));
-    tagY.value  = withDelay(1250, withSpring(0, { damping: 14 }));
-
-    // --- 2100 ms: CTA appears with subtle pulse ---
-    ctaOp.value    = withDelay(2100, withTiming(1, { duration: 500 }));
-    ctaScale.value = withDelay(2100, withSpring(1, { damping: 11 }));
-    ctaPulse.value = withDelay(2800,
-      withRepeat(
-        withSequence(
-          withTiming(1.035, { duration: 700, easing: Easing.inOut(Easing.sin) }),
-          withTiming(1,     { duration: 700, easing: Easing.inOut(Easing.sin) })
-        ),
-        -1,
-        false
-      )
-    );
-
-    // Auto-advance after 3.8 s
-    const t = setTimeout(doExit, 3800);
-    return () => clearTimeout(t);
+    // Auto-advance at EXIT_AT_MS
+    const timer = setTimeout(doExit, EXIT_AT_MS);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Animated styles ───────────────────────────────────────────────────────────
-  const screenStyle  = useAnimatedStyle(() => ({ opacity: screenOp.value }));
-  const scanStyle    = useAnimatedStyle(() => ({
-    transform: [{ translateY: scanY.value }],
-    opacity: scanOp.value,
+  const screenStyle = useAnimatedStyle(() => ({ opacity: screenOp.value }));
+  const ringStyle   = useAnimatedStyle(() => ({
+    opacity:   ringOp.value,
+    transform: [{ scale: ringScale.value }],
   }));
-  const ringStyle    = useAnimatedStyle(() => ({
-    opacity: ringOp.value,
-    transform: [{ scale: ringScale.value * ringPulse.value }],
-  }));
-  const arcProps     = useAnimatedProps(() => ({
+  const arcProps = useAnimatedProps(() => ({
     strokeDashoffset: CIRC * (1 - arcProg.value),
   }));
-  const logoStyle    = useAnimatedStyle(() => ({
-    opacity: logoOp.value,
-    transform: [{ scale: logoScale.value }],
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity:   logoOp.value,
+    transform: [{ translateY: logoY.value }],
   }));
-  const lineStyle    = useAnimatedStyle(() => ({
-    width: lineW.value,
-    opacity: lineW.value / 200,
-  }));
-  const tagStyle     = useAnimatedStyle(() => ({
-    opacity: tagOp.value,
-    transform: [{ translateY: tagY.value }],
-  }));
-  const ctaStyle     = useAnimatedStyle(() => ({
-    opacity: ctaOp.value,
-    transform: [{ scale: ctaScale.value * ctaPulse.value }],
-  }));
+  const tagStyle = useAnimatedStyle(() => ({ opacity: tagOp.value }));
 
   return (
     <Animated.View style={[s.root, screenStyle]}>
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onPress={doExit}
-      >
-        {/* ── Background gradient ── */}
-        <LinearGradient
-          colors={["#0A0A0C", "#0D1109", "#080A06", "#0A0A0C"]}
-          locations={[0, 0.35, 0.65, 1]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
+      {/* Ambient brand glow */}
+      <View style={s.glow} />
 
-        {/* ── Radial glow behind ring ── */}
-        <View style={s.glowBg} />
+      {/* Center layout */}
+      <View style={s.center}>
 
-        {/* ── Scan line ── */}
-        <Animated.View style={[s.scanLine, scanStyle]} />
+        {/* ── Progress ring — same design as home screen ── */}
+        <Animated.View style={[s.ringWrap, ringStyle]}>
+          <Svg
+            width={RING_SIZE}
+            height={RING_SIZE}
+            style={{ transform: [{ rotate: "-90deg" }] }}
+          >
+            {/* Track */}
+            <Circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RADIUS}
+              stroke={colors.surfaceTertiary}
+              strokeWidth={STROKE_W}
+              fill="none"
+            />
+            {/* Animated fill arc */}
+            <AnimatedCircle
+              animatedProps={arcProps}
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RADIUS}
+              stroke={colors.brand}
+              strokeWidth={STROKE_W}
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={`${CIRC} ${CIRC}`}
+            />
+          </Svg>
 
-        {/* ── Speed lines ── */}
-        {LINES.map((l, i) => <SpeedLine key={i} {...l} />)}
-
-        {/* ── Center content ── */}
-        <View style={s.center} pointerEvents="none">
-
-          {/* Ring + SVG progress arc */}
-          <Animated.View style={[s.ringWrap, ringStyle]}>
-            <View style={s.ringGlow} />
-            <Svg
-              width={RING}
-              height={RING}
-              style={{ transform: [{ rotate: "-90deg" }] }}
-            >
-              {/* Track */}
-              <Circle
-                cx={RING / 2}
-                cy={RING / 2}
-                r={RADIUS}
-                stroke="rgba(212,255,0,0.1)"
-                strokeWidth={STROKE}
-                fill="none"
-              />
-              {/* Animated progress arc */}
-              <AnimatedCircle
-                animatedProps={arcProps}
-                cx={RING / 2}
-                cy={RING / 2}
-                r={RADIUS}
-                stroke={colors.brand}
-                strokeWidth={STROKE + 1}
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray={`${CIRC} ${CIRC}`}
-              />
-            </Svg>
-            {/* Icon inside ring */}
-            <View style={s.ringIcon}>
-              <Text style={s.ringIconTxt}>⚡</Text>
-            </View>
-          </Animated.View>
-
-          {/* AEROSTEP wordmark */}
-          <Animated.View style={[s.logoWrap, logoStyle]}>
-            <Text style={s.logoTxt}>AEROSTEP</Text>
-          </Animated.View>
-
-          {/* Divider */}
-          <View style={s.lineTrack}>
-            <Animated.View style={[s.line, lineStyle]} />
-          </View>
-
-          {/* Tagline */}
-          <Animated.Text style={[s.tagline, tagStyle]}>
-            YOUR PERSONAL FITNESS COACH
-          </Animated.Text>
-        </View>
-
-        {/* ── Bottom CTA ── */}
-        <Animated.View style={[s.ctaWrap, ctaStyle]} pointerEvents="none">
-          <View style={s.ctaBtn}>
-            <Text style={s.ctaTxt}>TAP TO BEGIN  →</Text>
+          {/* Content inside ring */}
+          <View style={s.ringInner}>
+            <Text style={s.countTxt}>{displayCount.toLocaleString()}</Text>
+            <Text style={s.countGoal}>/ 10,000</Text>
+            <Text style={s.stepsLabel}>STEPS</Text>
           </View>
         </Animated.View>
-      </TouchableOpacity>
+
+        {/* ── Wordmark + tagline ── */}
+        <Animated.View style={[s.logoBlock, logoStyle]}>
+          <Text style={s.appName}>AEROSTEP</Text>
+          <Animated.View style={tagStyle}>
+            <View style={s.divider} />
+            <Text style={s.tagline}>TRACK EVERY STEP</Text>
+          </Animated.View>
+        </Animated.View>
+
+      </View>
     </Animated.View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const LINE_TRACK_W = 200;
-
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0A0C",
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  // Background glow (soft radial brand-color blob at center)
-  glowBg: {
-    position: "absolute",
-    width: 320,
-    height: 320,
-    borderRadius: 160,
+  // Soft radial brand glow
+  glow: {
+    position:        "absolute",
+    width:           300,
+    height:          300,
+    borderRadius:    150,
     backgroundColor: colors.brand,
-    opacity: 0.045,
-    top: H / 2 - 200,
-    alignSelf: "center",
+    opacity:         0.05,
+    top:             H / 2 - 210,
+    alignSelf:       "center",
   },
 
-  // Scan line
-  scanLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 2,
-    top: 0,
-    backgroundColor: "rgba(212,255,0,0.18)",
-    shadowColor: colors.brand,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-
-  // Center column
+  // Vertical stack
   center: {
-    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
+    gap: 32,
   },
 
-  // Ring wrapper
+  // Ring wrapper (absolute-positioned inner content overlay)
   ringWrap: {
-    width: RING,
-    height: RING,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
+    width:           RING_SIZE,
+    height:          RING_SIZE,
+    alignItems:      "center",
+    justifyContent:  "center",
   },
-  ringGlow: {
-    position: "absolute",
-    width: RING * 1.55,
-    height: RING * 1.55,
-    borderRadius: RING,
-    backgroundColor: colors.brand,
-    opacity: 0.07,
+  ringInner: {
+    position:       "absolute",
+    alignItems:     "center",
   },
-  ringIcon: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ringIconTxt: {
-    fontSize: 40,
-  },
-
-  // Wordmark
-  logoWrap: {
-    alignItems: "center",
-    marginTop: 2,
-  },
-  logoTxt: {
+  countTxt: {
     fontFamily: fonts.display,
-    fontSize: 52,
-    color: colors.brand,
-    letterSpacing: 9,
-    lineHeight: 58,
+    fontSize:   46,
+    color:      colors.onSurface,
+    lineHeight: 50,
   },
-
-  // Divider
-  lineTrack: {
-    width: LINE_TRACK_W,
-    height: 1,
-    backgroundColor: "rgba(212,255,0,0.08)",
-    marginVertical: 4,
-    overflow: "hidden",
-    alignItems: "flex-start",
-  },
-  line: {
-    height: 1,
-    backgroundColor: colors.brand,
-    opacity: 0,
-  },
-
-  // Tagline
-  tagline: {
+  countGoal: {
     fontFamily: fonts.text,
-    fontSize: 11,
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 3.5,
-    textAlign: "center",
-    marginTop: 2,
+    fontSize:   14,
+    color:      colors.onSurfaceSecondary,
+    marginTop:  2,
+  },
+  stepsLabel: {
+    fontFamily:    fonts.textBold,
+    fontSize:      10,
+    color:         colors.onSurfaceSecondary,
+    letterSpacing: 2,
+    marginTop:     4,
   },
 
-  // CTA
-  ctaWrap: {
+  // Wordmark block
+  logoBlock: {
     alignItems: "center",
-    paddingBottom: 62,
+    gap: 0,
   },
-  ctaBtn: {
-    borderWidth: 1,
-    borderColor: "rgba(212,255,0,0.28)",
-    borderRadius: 100,
-    paddingHorizontal: 30,
-    paddingVertical: 14,
-    backgroundColor: "rgba(212,255,0,0.05)",
+  appName: {
+    fontFamily:    fonts.display,
+    fontSize:      44,
+    color:         colors.brand,
+    letterSpacing: 8,
+    lineHeight:    48,
   },
-  ctaTxt: {
-    fontFamily: fonts.display,
-    fontSize: 15,
-    color: colors.brand,
+  divider: {
+    width:           52,
+    height:          1,
+    backgroundColor: colors.borderStrong,
+    alignSelf:       "center",
+    marginTop:       12,
+    marginBottom:    10,
+  },
+  tagline: {
+    fontFamily:    fonts.text,
+    fontSize:      11,
+    color:         colors.onSurfaceSecondary,
     letterSpacing: 3,
+    textAlign:     "center",
   },
 });
