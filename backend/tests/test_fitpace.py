@@ -1,8 +1,11 @@
-"""FitPace backend API tests - iteration 6"""
+"""FitPace backend API tests - iteration 7"""
 import pytest
 import requests
 import os
+from dotenv import load_dotenv
+from pathlib import Path
 
+load_dotenv(Path('/app/frontend/.env'))
 BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', '').rstrip('/')
 DEVICE_ID = "TEST_fitpace_iter6_device"
 
