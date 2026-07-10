@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, fonts } from "@/src/theme";
-import { apiPost, getDeviceId } from "@/src/api";
+import { apiPost, apiGet, getDeviceId, todayStr } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 
 const GENDERS = [
@@ -54,6 +54,13 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pre-warm the HTTPS connection so the first real request (POST /profile)
+  // doesn't pay the TLS-handshake tax (~1-3s on mobile cold start).
+  useEffect(() => {
+    apiGet("/health").catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggleCondition(key: string) {
     setConditions((prev) =>
       prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
@@ -83,6 +90,8 @@ export default function OnboardingScreen() {
         health_conditions: conditions,
       });
       await storage.setItem("profile_complete", true);
+      // Pre-warm AI coach cache — fire & forget so home loads tip instantly.
+      apiPost("/ai/coach", { device_id: deviceId, date: todayStr(), refresh: false }).catch(() => {});
       router.replace("/(tabs)/home");
     } catch (e: any) {
       setError(e.message || "Failed to save. Please try again.");

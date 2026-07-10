@@ -1,0 +1,44 @@
+{
+  "summary": "Performance testing for FitPace profile creation flow. All key fixes verified: health warm-up on mount, fire-and-forget AI pre-fetch, home screen independent render. Navigation 0.08s. Critical bug found: AbortController signal not passed to apiPost — 8s timeout does not abort the fetch.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "AI tip 8-second abort timeout",
+        "issue": "loadAiTip in home.tsx creates AbortController and sets 8s timeout, but controller.signal is NEVER passed to apiPost(). apiPost() in api.ts also has no signal parameter. The abort() call has no effect on the fetch — if the AI call takes >8s it will NOT abort and NOT show fallback. The AbortController is effectively dead code.",
+        "affected_testIDs": ["ai-card", "refresh-ai"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_performance_flow.py",
+    "/app/test_reports/pytest/pytest_perf_results.xml"
+  ],
+  "action_items": [
+    "FIX AbortController bug: pass controller.signal to apiPost, and update apiPost signature to accept optional signal: `async function apiPost<T>(path, body, signal?: AbortSignal)` then pass it to fetch options. Without this the 8s fallback never triggers.",
+    "Example fix in api.ts: `export async function apiPost<T = any>(path: string, body: any, signal?: AbortSignal): Promise<T> { const res = await fetch(url, { method: 'POST', headers: {...}, body: ..., signal }); ... }`",
+    "Example fix in home.tsx loadAiTip: `const res = await apiPost('/ai/coach', {...}, controller.signal);`"
+  ],
+  "critical_code_review_comments": [
+    "CRITICAL: home.tsx loadAiTip — AbortController created but signal never passed to apiPost/fetch. The 8s timeout is non-functional. fetch will run until network-level timeout (can be 60s+).",
+    "api.ts apiPost does not accept AbortSignal parameter — needs to be added alongside the fix in home.tsx"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_performance_flow.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "95% — onboarding→home navigation fast (0.08s), step ring + metrics render independently, AI loading state shown then real tip loaded. AbortController bug means fallback mechanism is broken but happy path works."
+  },
+  "seed_data_creation": "Created TEST Flow User and TEST_perf_flow_device_001 profiles",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Core performance fixes working: health warm-up on onboarding mount confirmed, fire-and-forget AI pre-fetch after profile POST confirmed, home metrics render without waiting for AI. One bug remains: AbortController signal not wired to fetch — the 8s abort/fallback does not work.",
+  "rca_of_issue": "AbortController.abort() only cancels fetches that have the signal attached via `fetch(url, { signal })`. In home.tsx, the controller is created and timer set, but apiPost() is called without passing the signal. apiPost() itself does not accept a signal param. Fix: add `signal?: AbortSignal` param to apiPost and pass it to fetch, then call `apiPost('/ai/coach', body, controller.signal)` in loadAiTip."
+}

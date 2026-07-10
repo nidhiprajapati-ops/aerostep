@@ -174,9 +174,17 @@ export default function HomeScreen() {
   }, [stepSource]);
 
   // ─── AI Tips ──────────────────────────────────────────────────────────
+  const FALLBACK_TIP =
+    "Stay consistent — even 10 minutes of walking a day builds a lasting habit. Keep going! 🏃";
+
   const loadAiTip = useCallback(async (refresh = false) => {
     if (!deviceIdRef.current) return;
     setAiLoading(true);
+
+    // Abort if the server takes longer than 8 seconds (prevents indefinite spinner)
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
     try {
       const res = await apiPost<{ tip: string }>("/ai/coach", {
         device_id: deviceIdRef.current,
@@ -184,8 +192,13 @@ export default function HomeScreen() {
         refresh,
       });
       setAiTip(res.tip);
-    } catch {}
-    finally { setAiLoading(false); }
+    } catch {
+      // Show a friendly fallback so the section is never empty
+      setAiTip((prev) => prev || FALLBACK_TIP);
+    } finally {
+      clearTimeout(timer);
+      setAiLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
