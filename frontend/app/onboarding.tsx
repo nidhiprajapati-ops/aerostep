@@ -7,10 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, fonts } from "@/src/theme";
 import { apiPost, getDeviceId } from "@/src/api";
@@ -91,15 +92,19 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <KeyboardAwareScrollView
+    <KeyboardAvoidingView
       style={s.bg}
-      contentContainerStyle={[
-        s.content,
-        { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 48 },
-      ]}
-      showsVerticalScrollIndicator={false}
-      bottomOffset={24}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <ScrollView
+        style={s.bg}
+        contentContainerStyle={[
+          s.content,
+          { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 48 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Logo */}
       <View style={s.logoBlock}>
         <Text style={s.logo}>AEROSTEP</Text>
@@ -252,7 +257,8 @@ export default function OnboardingScreen() {
           <Text style={s.ctaTxt}>Create My Profile →</Text>
         )}
       </TouchableOpacity>
-    </KeyboardAwareScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

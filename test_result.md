@@ -277,24 +277,23 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "App loads and shows loading spinner"
-    - "Initial routing fix - app boots to onboarding/home NOT devices screen"
-    - "Onboarding screen - profile setup form"
+    - "App loads and shows loading spinner - then navigates to onboarding"
+    - "Onboarding screen renders and form submission works"
     - "Home dashboard screen with progress ring"
     - "Stats screen with SVG bar chart"
     - "Awards screen with streak card and badge grid"
     - "Profile screen with editable form"
     - "Tab navigation between all 4 screens"
-    - "Backend health check and API endpoints"
+    - "Backend health check endpoint"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Previous session fixed a critical routing regression where the app was booting to the devices.tsx screen instead of onboarding. The fix placed devices.tsx outside the root _layout.tsx stack explicit listing and the index.tsx redirects to onboarding (first time) or home. Please validate: 1) App boots to loading spinner then onboarding (NOT devices screen) 2) All screens work correctly 3) Backend endpoints are healthy. BLE features are not testable in web/Expo Go - skip BLE-specific tests. Device ID is auto-generated via AsyncStorage."
+    message: "Fixed 3 critical issues: 1) react-native-keyboard-controller has no web support causing blank screen - fixed by replacing KeyboardProvider with platform-conditional View on web, and replacing KeyboardAwareScrollView with native ScrollView+KeyboardAvoidingView in onboarding.tsx and profile.tsx. 2) Custom font loading on web was blocking render indefinitely - fixed by only loading custom fonts on native (not web). 3) Added missing Ionicons import that was accidentally removed. App name changed to 'FitPace' in app.json. Screenshots confirm onboarding is now rendering on web. Test all screens end-to-end."

@@ -7,9 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { colors, radius, fonts } from "@/src/theme";
@@ -122,14 +124,18 @@ export default function ProfileScreen() {
 
   return (
     <View style={s.root}>
-      <KeyboardAwareScrollView
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[
           s.content,
           { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 120 },
         ]}
         showsVerticalScrollIndicator={false}
-        bottomOffset={16}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Profile Avatar + Name */}
         <View style={s.avatarRow}>
@@ -372,13 +378,14 @@ export default function ProfileScreen() {
               </Text>
             </View>
           )}
-        </TouchableOpacity>
+      </TouchableOpacity>
 
         <Text style={s.infoTxt}>
           Saving recalculates your daily step and calorie goals based on your
           updated biometrics.
         </Text>
-      </KeyboardAwareScrollView>
+      </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
