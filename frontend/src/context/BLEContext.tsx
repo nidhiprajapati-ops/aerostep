@@ -50,6 +50,10 @@ interface BLEContextValue {
   batteryLevel: number | null;
   /** Which source the home ring is showing. */
   stepSource: StepSource;
+  /** True while attempting to auto-reconnect to last device on BT power-on. */
+  isReconnecting: boolean;
+  /** Name of the last saved BLE device (shown during reconnect). */
+  lastConnectedName: string | null;
   requestBLEPermission: () => Promise<boolean>;
   startScan: () => void;
   stopScan: () => void;
@@ -164,6 +168,11 @@ export function BLEProvider({ children }: { children: ReactNode }) {
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subs = useRef<{ remove: () => void }[]>([]);
   const rscTimestampRef = useRef<number>(Date.now());
+  // Used to prevent repeated auto-reconnect within a single BT power-on session
+  const autoReconnectDoneRef = useRef(false);
+  // Keep latest connectDevice in a ref to call from the auto-reconnect effect without
+  // adding it to the effect's dep array (would cause a loop)
+  const connectDeviceRef = useRef<((info: BLEDeviceInfo) => Promise<void>) | null>(null);
 
   const [bleState, setBleState] = useState('Unknown');
   const [blePermission, setBlePermission] = useState<BLEPermStatus>('unknown');
@@ -175,6 +184,8 @@ export function BLEProvider({ children }: { children: ReactNode }) {
   const [bleCadence, setBleCadence] = useState<number | null>(null);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [stepSource, setStepSourceState] = useState<StepSource>('phone');
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [lastConnectedName, setLastConnectedName] = useState<string | null>(null);
 
   // ─── Initialise BLE Manager ───────────────────────────────────────────────
 
@@ -203,6 +214,14 @@ export function BLEProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // ─── Restore last connected device name (for reconnect UI hint) ───────────
+
+  useEffect(() => {
+    storage.getItem<string>('ble_last_device_name', '').then((name) => {
+      if (name) setLastConnectedName(name);
+    });
+  }, []);
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   const cleanupSubs = useCallback(() => {
@@ -215,6 +234,44 @@ export function BLEProvider({ children }: { children: ReactNode }) {
     if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
     setIsScanning(false);
   }, []);
+
+  // ─── Auto-reconnect when Bluetooth powers on ─────────────────────────────
+  // Fires once per BT power-on session; retries on the next power-on if the
+  // device was out of range the previous time.
+
+  useEffect(() => {
+    if (bleState !== 'PoweredOn' || !managerRef.current) return;
+    if (autoReconnectDoneRef.current) return; // already tried this session
+    autoReconnectDoneRef.current = true;
+
+    let cancelled = false;
+
+    const tryReconnect = async () => {
+      const [savedId, savedName] = await Promise.all([
+        storage.getItem<string>('ble_last_device_id', ''),
+        storage.getItem<string>('ble_last_device_name', ''),
+      ]);
+      if (!savedId || cancelled) return;
+      if (!connectDeviceRef.current) return;
+
+      setIsReconnecting(true);
+      try {
+        await connectDeviceRef.current({
+          id: savedId,
+          name: savedName || 'Fitness Device',
+          rssi: -80,
+        });
+      } catch {
+        // Device out of range or rejected — silent failure
+      } finally {
+        if (!cancelled) setIsReconnecting(false);
+      }
+    };
+
+    // Small delay so BLE stack settles after power-on
+    const timer = setTimeout(tryReconnect, 3000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [bleState]); // bleState is the only intentional dep; connectDevice called via ref
 
   // ─── Request BLE permissions ──────────────────────────────────────────────
 
@@ -275,6 +332,7 @@ export function BLEProvider({ children }: { children: ReactNode }) {
 
       // Reset live data
       setConnectedDevice(info);
+      setLastConnectedName(info.name);
       setBleSteps(0);
       setHeartRate(null);
       setBleCadence(null);
@@ -348,6 +406,8 @@ export function BLEProvider({ children }: { children: ReactNode }) {
           setHeartRate(null);
           setBleCadence(null);
           cleanupSubs();
+          // Allow auto-reconnect to fire again on next BT power-on cycle
+          autoReconnectDoneRef.current = false;
         });
         if (discSub) subs.current.push(discSub);
       } catch {}
@@ -369,6 +429,8 @@ export function BLEProvider({ children }: { children: ReactNode }) {
     setHeartRate(null);
     setBleCadence(null);
     setBleSteps(0);
+    // Reset flag so next BT power-on will attempt auto-reconnect
+    autoReconnectDoneRef.current = false;
   }, [connectedDevice, cleanupSubs]);
 
   // ─── Source preference ────────────────────────────────────────────────────
@@ -377,6 +439,12 @@ export function BLEProvider({ children }: { children: ReactNode }) {
     setStepSourceState(src);
     await storage.setItem('step_source', src);
   }, []);
+
+  // Keep connectDeviceRef current so auto-reconnect effect can call it
+  // without adding connectDevice to the effect's dependency array
+  useEffect(() => {
+    connectDeviceRef.current = connectDevice;
+  });
 
   // ─── Context value ────────────────────────────────────────────────────────
 
@@ -392,6 +460,8 @@ export function BLEProvider({ children }: { children: ReactNode }) {
     bleCadence,
     batteryLevel,
     stepSource,
+    isReconnecting,
+    lastConnectedName,
     requestBLEPermission,
     startScan,
     stopScan,

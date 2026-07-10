@@ -1,0 +1,52 @@
+{
+  "summary": "Tested Weekly Stats Source Breakdown (All/Phone/BLE toggle) and backend step source tracking. All 10 backend tests pass. All frontend feature tests pass. Auto-reconnect spinner in Profile renders correctly (no crash). BLE auto-reconnect cannot be tested in web preview (expected).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_steps_source.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_steps_source.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "100% (all tested flows pass)"
+  },
+  "seed_data_creation": "Created test profile and step data via backend API during tests (device_id prefixed with TEST_)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Stats source toggle (All/Phone/BLE) fully working. Backend steps_phone/steps_ble fields correctly stored and returned in history. Profile Connected Devices card navigates to /devices. Home screen Phone/BLE source toggle works. BLE native module unavailable in web preview (expected - shows Native Build Required screen).",
+  "tests_executed": {
+    "backend": [
+      "POST /api/steps with source=phone increments steps_phone - PASS",
+      "POST /api/steps with source=ble increments steps_ble - PASS",
+      "GET /api/steps/{id}/history returns steps_phone per day - PASS",
+      "GET /api/steps/{id}/history returns steps_ble per day - PASS",
+      "History today entry has correct phone step count (>=800) - PASS",
+      "History today entry has correct BLE step count (>=200) - PASS",
+      "Total steps == steps_phone + steps_ble - PASS",
+      "30-day history returns 30 days - PASS"
+    ],
+    "frontend": [
+      "Stats screen renders source toggle [All][Phone][BLE] below chart title - PASS",
+      "Clicking Phone shows PHONE STEPS title - PASS",
+      "Clicking BLE shows BLE STEPS title, BLE legend, no 'Goal met' legend - PASS",
+      "Clicking All reverts to DAILY STEPS + Goal met/Below goal legends - PASS",
+      "Daily breakdown rows visible in all 3 source views - PASS",
+      "Profile Connected Devices card navigates to /devices - PASS",
+      "Profile ActivityIndicator import works (no crash, isReconnecting state renders) - PASS",
+      "Home screen Phone/BLE Device source toggle renders and is tappable - PASS"
+    ]
+  }
+}

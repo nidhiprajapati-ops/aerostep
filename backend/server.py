@@ -164,8 +164,22 @@ async def get_profile_doc(device_id: str) -> Optional[Profile]:
 
 
 async def get_steps_map(device_id: str) -> dict:
+    """Returns {date: total_steps} — used for achievements & streaks."""
     docs = await db.step_days.find({"device_id": device_id}).to_list(2000)
     return {d["date"]: d.get("steps", 0) for d in docs}
+
+
+async def get_steps_map_full(device_id: str) -> dict:
+    """Returns {date: {steps, steps_phone, steps_ble}} — used for history chart."""
+    docs = await db.step_days.find({"device_id": device_id}).to_list(2000)
+    return {
+        d["date"]: {
+            "steps": d.get("steps", 0),
+            "steps_phone": d.get("steps_phone", 0),
+            "steps_ble": d.get("steps_ble", 0),
+        }
+        for d in docs
+    }
 
 
 def calc_streaks(steps_map: dict, goal: int, today: str):
@@ -276,13 +290,21 @@ async def get_day(device_id: str, date: str):
 @api_router.get("/steps/{device_id}/history")
 async def get_history(device_id: str, days: int = 7, end: Optional[str] = None):
     profile = await get_profile_doc(device_id)
-    steps_map = await get_steps_map(device_id)
+    full_map = await get_steps_map_full(device_id)
+    goal = profile.step_goal if profile else 10000
     end_dt = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc)
     out = []
     for i in range(days - 1, -1, -1):
         d = (end_dt - timedelta(days=i)).strftime("%Y-%m-%d")
-        s = steps_map.get(d, 0)
-        out.append({"date": d, "steps": s, "met_goal": s >= (profile.step_goal if profile else 10000)})
+        day_data = full_map.get(d, {})
+        s = day_data.get("steps", 0)
+        out.append({
+            "date": d,
+            "steps": s,
+            "steps_phone": day_data.get("steps_phone", 0),
+            "steps_ble": day_data.get("steps_ble", 0),
+            "met_goal": s >= goal,
+        })
     total = sum(x["steps"] for x in out)
     active_days = [x for x in out if x["steps"] > 0]
     best = max(out, key=lambda x: x["steps"]) if out else None

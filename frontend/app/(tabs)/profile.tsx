@@ -41,7 +41,7 @@ const HEALTH_CONDITIONS = [
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { connectedDevice, heartRate } = useBLEContext();
+  const { connectedDevice, heartRate, isReconnecting, lastConnectedName } = useBLEContext();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState("");
@@ -307,17 +307,26 @@ export default function ProfileScreen() {
           <View style={s.devicesLeft}>
             <View style={[
               s.devicesIconWrap,
-              connectedDevice && { backgroundColor: colors.brand + "22" },
+              (connectedDevice || isReconnecting) && { backgroundColor: colors.brand + "22" },
             ]}>
-              <Ionicons
-                name="bluetooth"
-                size={18}
-                color={connectedDevice ? colors.brand : colors.onSurfaceSecondary}
-              />
-              {connectedDevice && <View style={s.devConnDot} />}
+              {isReconnecting ? (
+                <ActivityIndicator size="small" color={colors.brand} />
+              ) : (
+                <Ionicons
+                  name="bluetooth"
+                  size={18}
+                  color={connectedDevice ? colors.brand : colors.onSurfaceSecondary}
+                />
+              )}
+              {connectedDevice && !isReconnecting && <View style={s.devConnDot} />}
             </View>
             <View>
-              {connectedDevice ? (
+              {isReconnecting ? (
+                <>
+                  <Text style={s.devicesTitle}>Reconnecting…</Text>
+                  <Text style={s.devicesSub}>{lastConnectedName ?? "Last paired device"}</Text>
+                </>
+              ) : connectedDevice ? (
                 <>
                   <Text style={s.devicesTitle} numberOfLines={1}>{connectedDevice.name}</Text>
                   <Text style={s.devicesSub}>
