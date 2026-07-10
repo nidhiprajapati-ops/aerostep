@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showPermExplainer, setShowPermExplainer] = useState(false);
+  const [showCombined, setShowCombined] = useState(false);
 
   const deviceIdRef = useRef("");
   const pendingRef = useRef(0);
@@ -94,16 +95,23 @@ export default function HomeScreen() {
   const { available, permission, requestPermission } = usePedometer(onDelta);
 
   // ─── Computed display values ──────────────────────────────────────────
-  const weight = profile?.weight_kg ?? 70;
-  const heightCm = profile?.height_cm ?? 170;
-  const goal = profile?.step_goal ?? 10000;
+  const weight    = profile?.weight_kg ?? 70;
+  const heightCm  = profile?.height_cm ?? 170;
+  const goal      = profile?.step_goal ?? 10000;
 
-  // Which step count to show depends on selected source
-  const displaySteps = stepSource === "ble" ? bleSteps : localSteps;
-  const progress = Math.min(1, displaySteps / Math.max(goal, 1));
-  const calories = Math.round(displaySteps * 0.00057 * weight);
+  // Combined mode shows phone + BLE total; otherwise respect source toggle
+  const displaySteps = showCombined
+    ? localSteps + bleSteps
+    : stepSource === "ble" ? bleSteps : localSteps;
+  const progress   = Math.min(1, displaySteps / Math.max(goal, 1));
+  const calories   = Math.round(displaySteps * 0.00057 * weight);
   const distanceKm = (displaySteps * heightCm * 0.00415 / 1000).toFixed(2);
-  const activeMin = Math.floor(displaySteps / 110);
+  const activeMin  = Math.floor(displaySteps / 110);
+
+  // Reset combined mode if BLE device disconnects
+  React.useEffect(() => {
+    if (!connectedDevice) setShowCombined(false);
+  }, [connectedDevice]);
 
   // ─── Load data ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -345,7 +353,11 @@ export default function HomeScreen() {
               </Text>
               <Text style={s.stepGoal}>/ {goal.toLocaleString()}</Text>
               <Text style={s.stepLabel}>
-                {stepSource === "ble" ? "BLE STEPS" : "STEPS TODAY"}
+                {showCombined
+                  ? "COMBINED STEPS"
+                  : stepSource === "ble"
+                  ? "BLE STEPS"
+                  : "STEPS TODAY"}
               </Text>
             </View>
           </ProgressRing>
@@ -359,9 +371,10 @@ export default function HomeScreen() {
           {/* Source Toggle */}
           <View style={s.sourceToggle}>
             <TouchableOpacity
-              style={[s.sourcePill, stepSource === "phone" && s.sourcePillOn]}
+              style={[s.sourcePill, !showCombined && stepSource === "phone" && s.sourcePillOn]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowCombined(false);
                 setStepSource("phone");
               }}
               activeOpacity={0.8}
@@ -369,15 +382,15 @@ export default function HomeScreen() {
               <Ionicons
                 name="phone-portrait-outline"
                 size={12}
-                color={stepSource === "phone" ? colors.onBrand : colors.onSurfaceSecondary}
+                color={!showCombined && stepSource === "phone" ? colors.onBrand : colors.onSurfaceSecondary}
               />
-              <Text style={[s.sourcePillTxt, stepSource === "phone" && s.sourcePillTxtOn]}>
+              <Text style={[s.sourcePillTxt, !showCombined && stepSource === "phone" && s.sourcePillTxtOn]}>
                 Phone
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[s.sourcePill, stepSource === "ble" && s.sourcePillOn]}
+              style={[s.sourcePill, !showCombined && stepSource === "ble" && s.sourcePillOn]}
               onPress={async () => {
                 if (!connectedDevice) {
                   Alert.alert(
@@ -388,6 +401,7 @@ export default function HomeScreen() {
                   return;
                 }
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowCombined(false);
                 await setStepSource("ble");
               }}
               activeOpacity={0.8}
@@ -395,15 +409,36 @@ export default function HomeScreen() {
               <Ionicons
                 name="bluetooth"
                 size={12}
-                color={stepSource === "ble" ? colors.onBrand : colors.onSurfaceSecondary}
+                color={!showCombined && stepSource === "ble" ? colors.onBrand : colors.onSurfaceSecondary}
               />
-              <Text style={[s.sourcePillTxt, stepSource === "ble" && s.sourcePillTxtOn]}>
+              <Text style={[s.sourcePillTxt, !showCombined && stepSource === "ble" && s.sourcePillTxtOn]}>
                 BLE Device
               </Text>
               {connectedDevice && (
-                <View style={[s.bleStatusDot, stepSource === "ble" && s.bleStatusDotOn]} />
+                <View style={[s.bleStatusDot, !showCombined && stepSource === "ble" && s.bleStatusDotOn]} />
               )}
             </TouchableOpacity>
+
+            {/* Combined pill — only shown when BLE is connected */}
+            {connectedDevice && (
+              <TouchableOpacity
+                style={[s.sourcePill, showCombined && s.sourcePillCombined]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowCombined(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="layers-outline"
+                  size={12}
+                  color={showCombined ? colors.onBrand : colors.onSurfaceSecondary}
+                />
+                <Text style={[s.sourcePillTxt, showCombined && s.sourcePillTxtOn]}>
+                  Combined
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -759,6 +794,7 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
   },
   sourcePillOn: { backgroundColor: colors.brand },
+  sourcePillCombined: { backgroundColor: colors.brand },
   sourcePillTxt: { fontFamily: fonts.textBold, fontSize: 12, color: colors.onSurfaceSecondary },
   sourcePillTxtOn: { color: colors.onBrand },
   bleStatusDot: {

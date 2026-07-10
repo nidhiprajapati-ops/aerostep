@@ -57,13 +57,18 @@ function BarChart({
   goal,
   width,
   sourceView,
+  hasBLEData,
 }: {
   data: HistoryDay[];
   goal: number;
   width: number;
   sourceView: SourceView;
+  hasBLEData: boolean;
 }) {
   if (!data.length) return null;
+
+  const isStacked = sourceView === "all" && hasBLEData;
+
   const PAD = { l: 8, r: 8, t: 12, b: 26 };
   const innerH = 128;
   const totalH = innerH + PAD.t + PAD.b;
@@ -71,7 +76,12 @@ function BarChart({
   const barW = innerW / data.length;
   const barGap = data.length > 14 ? 2 : 5;
 
-  const values = data.map((d) => stepsForView(d, sourceView));
+  // For stacked mode use combined total; otherwise use selected source
+  const values = data.map((d) =>
+    isStacked
+      ? (d.steps_phone ?? 0) + (d.steps_ble ?? 0)
+      : stepsForView(d, sourceView),
+  );
   const maxVal = Math.max(goal, ...values, 1);
   const goalFrac = goal / maxVal;
   const goalY = PAD.t + innerH * (1 - goalFrac);
@@ -88,19 +98,77 @@ function BarChart({
         x1={PAD.l} y1={goalY} x2={width - PAD.r} y2={goalY}
         stroke={colors.brand} strokeWidth={1} strokeDasharray="5,3" opacity={0.6}
       />
+
       {data.map((day, i) => {
-        const val = values[i];
-        const bH = Math.max(3, (val / maxVal) * innerH);
-        const bW = Math.max(3, barW - barGap);
-        const x = PAD.l + i * barW + barGap / 2;
-        const y = PAD.t + innerH - bH;
-        const metGoal = val >= goal;
+        const bW  = Math.max(3, barW - barGap);
+        const x   = PAD.l + i * barW + barGap / 2;
         const dayNum = day.date.slice(8);
+
+        if (isStacked) {
+          // ── Stacked: phone (bottom, brand) + BLE (top, blue) ──────────────
+          const phone = day.steps_phone ?? 0;
+          const ble   = day.steps_ble   ?? 0;
+          const total = phone + ble;
+          const totalH_bar = Math.max(total > 0 ? 3 : 0, (total / maxVal) * innerH);
+          const phoneH = total > 0 ? (phone / total) * totalH_bar : 0;
+          const bleH   = total > 0 ? (ble   / total) * totalH_bar : 0;
+          const baseY  = PAD.t + innerH; // bottom of chart
+
+          return (
+            <G key={day.date}>
+              {/* Phone segment (bottom) */}
+              {phoneH > 0 && (
+                <Rect
+                  x={x}
+                  y={baseY - phoneH}
+                  width={bW}
+                  height={phoneH}
+                  rx={total === phone ? 3 : 0}
+                  fill={total >= goal ? colors.brand : colors.surfaceTertiary}
+                />
+              )}
+              {/* BLE segment (top) */}
+              {bleH > 0 && (
+                <Rect
+                  x={x}
+                  y={baseY - phoneH - bleH}
+                  width={bW}
+                  height={bleH}
+                  rx={3}
+                  fill={BLE_COLOR}
+                />
+              )}
+              {/* Empty placeholder */}
+              {total === 0 && (
+                <Rect
+                  x={x} y={baseY - 3} width={bW} height={3} rx={1}
+                  fill={colors.surfaceTertiary} opacity={0.3}
+                />
+              )}
+              {data.length <= 14 && (
+                <SvgText
+                  x={x + bW / 2} y={totalH - 6}
+                  textAnchor="middle"
+                  fill={colors.onSurfaceSecondary}
+                  fontSize={9}
+                >
+                  {dayNum}
+                </SvgText>
+              )}
+            </G>
+          );
+        }
+
+        // ── Single-color bar (phone-only or ble-only view) ─────────────────
+        const val = values[i];
+        const bH  = Math.max(val > 0 ? 3 : 0, (val / maxVal) * innerH);
+        const y   = PAD.t + innerH - bH;
+        const metGoal = val >= goal;
 
         return (
           <G key={day.date}>
             <Rect
-              x={x} y={y} width={bW} height={bH} rx={3}
+              x={x} y={y} width={bW} height={Math.max(3, bH)} rx={3}
               fill={barColor(val, metGoal)}
               opacity={val === 0 ? 0.3 : 1}
             />
@@ -258,7 +326,14 @@ export default function StatsScreen() {
               {/* Card header row: title + BLE badge if applicable */}
               <View style={s.chartHeader}>
                 <Text style={s.cardTitle}>
-                  {sourceView === "phone" ? "PHONE STEPS" : sourceView === "ble" ? "BLE STEPS" : "DAILY STEPS"} — {period} DAYS
+                  {sourceView === "phone"
+                    ? "PHONE STEPS"
+                    : sourceView === "ble"
+                    ? "BLE STEPS"
+                    : hasBLEData
+                    ? "PHONE + BLE STEPS"
+                    : "DAILY STEPS"}{" "}
+                  — {period} DAYS
                 </Text>
                 {hasBLEData && (
                   <View style={s.bleBadge}>
@@ -301,6 +376,7 @@ export default function StatsScreen() {
                   goal={goal}
                   width={chartW}
                   sourceView={sourceView}
+                  hasBLEData={hasBLEData}
                 />
               ) : (
                 <View style={s.emptyChart}>
@@ -326,6 +402,17 @@ export default function StatsScreen() {
                     <View style={[s.dot, { backgroundColor: BLE_COLOR }]} />
                     <Text style={s.legendTxt}>BLE steps</Text>
                   </View>
+                ) : sourceView === "all" && hasBLEData ? (
+                  <>
+                    <View style={s.legendItem}>
+                      <View style={[s.dot, { backgroundColor: colors.brand }]} />
+                      <Text style={s.legendTxt}>Phone</Text>
+                    </View>
+                    <View style={s.legendItem}>
+                      <View style={[s.dot, { backgroundColor: BLE_COLOR }]} />
+                      <Text style={s.legendTxt}>BLE</Text>
+                    </View>
+                  </>
                 ) : (
                   <>
                     <View style={s.legendItem}>
