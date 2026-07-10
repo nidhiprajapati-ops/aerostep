@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useBLEContext, BLEDeviceInfo } from '@/src/context/BLEContext';
 import { colors, radius, fonts } from '@/src/theme';
@@ -150,6 +150,8 @@ export default function DevicesScreen() {
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
+      {/* Configure this screen as a modal slide-up */}
+      <Stack.Screen options={{ presentation: 'modal', headerShown: false }} />
       {/* ─── Header ──────────────────────────────────────────────────── */}
       <View style={s.header}>
         <TouchableOpacity

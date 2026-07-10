@@ -47,9 +47,7 @@ export default function RootLayout() {
     <KeyboardProvider>
       <BLEProvider>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0A0A0C" } }}>
-          <Stack.Screen name="devices" options={{ presentation: "modal" }} />
-        </Stack>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0A0A0C" } }} />
       </BLEProvider>
     </KeyboardProvider>
   );
