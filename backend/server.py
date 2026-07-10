@@ -429,11 +429,14 @@ async def health_check():
 
 app.include_router(api_router)
 
+# CORS: allow all origins explicitly (credentials=False avoids the
+# CORS spec conflict where credentials + wildcard origin is forbidden).
+# The API uses device_id in the body — no session cookies required.
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=["*"],
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 

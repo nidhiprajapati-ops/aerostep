@@ -1,6 +1,12 @@
+import { Platform } from "react-native";
 import { storage } from "@/src/utils/storage";
 
-export const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
+// On web (browser), use a relative /api path — same-origin request, no CORS.
+// On native (Expo Go / iOS / Android), use the full backend URL from env.
+export const API_URL =
+  Platform.OS === "web"
+    ? "/api"
+    : `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 
 let cachedDeviceId: string | null = null;
 
