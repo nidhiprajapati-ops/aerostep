@@ -119,11 +119,11 @@ backend:
 
   - task: "Profile create/update endpoint (POST /api/profile)"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -131,6 +131,9 @@ backend:
       - working: false
         agent: "user"
         comment: "User reported Create My Profile is taking too long. Optimizing the persistence path and retesting end-to-end."
+      - working: true
+        agent: "testing"
+        comment: "Verified single-round-trip upsert, persistence, and prompt response. Regression suite passed 3/3."
 
   - task: "Get profile endpoint (GET /api/profile/{device_id})"
     implemented: true
@@ -207,11 +210,11 @@ frontend:
 
   - task: "Onboarding screen - profile setup form"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/app/onboarding.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -219,6 +222,9 @@ frontend:
       - working: false
         agent: "user"
         comment: "User reported slow profile submission. Added device ID preloading, a six-second request limit, clearer saving feedback, and removed duplicate AI prefetch."
+      - working: true
+        agent: "testing"
+        comment: "Verified Create My Profile navigates to Home in approximately 0.14–0.74 seconds with no indefinite saving state."
 
   - task: "Home dashboard screen with progress ring"
     implemented: true
@@ -304,3 +310,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Fixed 3 critical issues: 1) react-native-keyboard-controller has no web support causing blank screen - fixed by replacing KeyboardProvider with platform-conditional View on web, and replacing KeyboardAwareScrollView with native ScrollView+KeyboardAvoidingView in onboarding.tsx and profile.tsx. 2) Custom font loading on web was blocking render indefinitely - fixed by only loading custom fonts on native (not web). 3) Added missing Ionicons import that was accidentally removed. App name changed to 'FitPace' in app.json. Screenshots confirm onboarding is now rendering on web. Test all screens end-to-end."
+  - agent: "testing"
+    message: "Iteration 13 passed: profile submission is prompt, persists correctly, navigates to Home, and has bounded saving behavior."
