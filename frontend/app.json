@@ -12,7 +12,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.fitpace.m78wka",
       "infoPlist": {
-        "NSMotionUsageDescription": "Track daily steps and reach your fitness goals"
+        "NSMotionUsageDescription": "Track daily steps and reach your fitness goals",
+        "NSBluetoothAlwaysUsageDescription": "Connect fitness bands for heart rate and step tracking",
+        "NSBluetoothPeripheralUsageDescription": "Connect fitness bands for heart rate and step tracking",
+        "NSLocationWhenInUseUsageDescription": "Needed to scan for nearby Bluetooth fitness devices",
+        "UIBackgroundModes": ["bluetooth-central", "fetch", "processing"]
       }
     },
     "android": {
@@ -23,7 +27,13 @@
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.fitpace.m78wka",
       "permissions": [
-        "android.permission.ACTIVITY_RECOGNITION"
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
       ]
     },
     "web": {
@@ -41,7 +51,16 @@
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Connect fitness bands for heart rate and step tracking"
+        }
+      ],
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true

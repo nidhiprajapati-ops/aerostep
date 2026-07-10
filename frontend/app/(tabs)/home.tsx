@@ -9,13 +9,17 @@ import {
   RefreshControl,
   Linking,
   Platform,
+  Alert,
+  AppState,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import ProgressRing from "@/src/components/ProgressRing";
 import { usePedometer } from "@/src/hooks/usePedometer";
+import { useBLEContext } from "@/src/context/BLEContext";
 import { colors, radius, fonts } from "@/src/theme";
 import { apiGet, apiPost, getDeviceId, todayStr, Profile, DayMetrics } from "@/src/api";
 
@@ -59,8 +63,18 @@ export default function HomeScreen() {
 
   const deviceIdRef = useRef("");
   const pendingRef = useRef(0);
-  const goalRef = useRef(10000);           // goal stored in ref so onDelta can read it
-  const goalCelebrated = useRef(false);   // track if we've fired the goal haptic today
+  const goalRef = useRef(10000);
+  const goalCelebrated = useRef(false);
+  const lastSyncedBLEStepsRef = useRef(0);
+  const bleStepsRef = useRef(0);
+
+  // BLE context
+  const {
+    bleSteps, heartRate, connectedDevice, stepSource, setStepSource,
+  } = useBLEContext();
+
+  // Keep bleStepsRef in sync (avoids stale closure in syncBLESteps)
+  bleStepsRef.current = bleSteps;
 
   // ─── Pedometer ───────────────────────────────────────────────────────
   const onDelta = useCallback((delta: number) => {
@@ -83,10 +97,13 @@ export default function HomeScreen() {
   const weight = profile?.weight_kg ?? 70;
   const heightCm = profile?.height_cm ?? 170;
   const goal = profile?.step_goal ?? 10000;
-  const progress = Math.min(1, localSteps / Math.max(goal, 1));
-  const calories = Math.round(localSteps * 0.00057 * weight);
-  const distanceKm = (localSteps * heightCm * 0.00415 / 1000).toFixed(2);
-  const activeMin = Math.floor(localSteps / 110);
+
+  // Which step count to show depends on selected source
+  const displaySteps = stepSource === "ble" ? bleSteps : localSteps;
+  const progress = Math.min(1, displaySteps / Math.max(goal, 1));
+  const calories = Math.round(displaySteps * 0.00057 * weight);
+  const distanceKm = (displaySteps * heightCm * 0.00415 / 1000).toFixed(2);
+  const activeMin = Math.floor(displaySteps / 110);
 
   // ─── Load data ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -119,7 +136,7 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // ─── Sync pending steps ───────────────────────────────────────────────
+  // ─── Sync pending phone steps ─────────────────────────────────────────
   const syncPending = useCallback(async () => {
     if (pendingRef.current <= 0 || !deviceIdRef.current) return;
     const toSync = pendingRef.current;
@@ -130,11 +147,31 @@ export default function HomeScreen() {
         date: todayStr(),
         steps: toSync,
         mode: "increment",
+        source: "phone",
       });
     } catch {
       pendingRef.current += toSync;
     }
   }, []);
+
+  // ─── Sync BLE steps to backend ────────────────────────────────────────
+  const syncBLESteps = useCallback(async () => {
+    if (stepSource !== "ble" || !deviceIdRef.current) return;
+    const current = bleStepsRef.current;
+    if (current === 0 || current === lastSyncedBLEStepsRef.current) return;
+    lastSyncedBLEStepsRef.current = current;
+    try {
+      await apiPost("/steps", {
+        device_id: deviceIdRef.current,
+        date: todayStr(),
+        steps: current,
+        mode: "set",
+        source: "ble",
+      });
+    } catch {
+      lastSyncedBLEStepsRef.current = 0; // retry next cycle
+    }
+  }, [stepSource]);
 
   // ─── AI Tips ──────────────────────────────────────────────────────────
   const loadAiTip = useCallback(async (refresh = false) => {
@@ -159,9 +196,22 @@ export default function HomeScreen() {
   }, [profile?.device_id]);
 
   useEffect(() => {
-    const id = setInterval(syncPending, 15_000);
+    const id = setInterval(() => {
+      syncPending();
+      syncBLESteps();
+    }, 15_000);
     return () => clearInterval(id);
-  }, [syncPending]);
+  }, [syncPending, syncBLESteps]);
+
+  // ─── AppState: flush pending steps to AsyncStorage for background task ──
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        AsyncStorage.setItem("bg_pending_steps", String(pendingRef.current)).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -231,7 +281,7 @@ export default function HomeScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.explainerTitle}>Enable Step Tracking</Text>
                 <Text style={s.explainerBody}>
-                  AeroStep uses your phone's motion sensor to count steps in real time — no GPS, no battery drain.
+                  AeroStep uses your phone motion sensor to count steps in real time — no GPS, no battery drain.
                 </Text>
               </View>
             </View>
@@ -278,10 +328,12 @@ export default function HomeScreen() {
           <ProgressRing size={240} strokeWidth={16} progress={progress}>
             <View style={s.ringInner}>
               <Text style={s.stepCount} testID="step-count">
-                {localSteps.toLocaleString()}
+                {displaySteps.toLocaleString()}
               </Text>
               <Text style={s.stepGoal}>/ {goal.toLocaleString()}</Text>
-              <Text style={s.stepLabel}>STEPS TODAY</Text>
+              <Text style={s.stepLabel}>
+                {stepSource === "ble" ? "BLE STEPS" : "STEPS TODAY"}
+              </Text>
             </View>
           </ProgressRing>
 
@@ -290,7 +342,82 @@ export default function HomeScreen() {
             <Text style={s.pctValue}>{Math.round(progress * 100)}%</Text>
             <Text style={s.pctLabel}> of daily goal</Text>
           </View>
+
+          {/* Source Toggle */}
+          <View style={s.sourceToggle}>
+            <TouchableOpacity
+              style={[s.sourcePill, stepSource === "phone" && s.sourcePillOn]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setStepSource("phone");
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="phone-portrait-outline"
+                size={12}
+                color={stepSource === "phone" ? colors.onBrand : colors.onSurfaceSecondary}
+              />
+              <Text style={[s.sourcePillTxt, stepSource === "phone" && s.sourcePillTxtOn]}>
+                Phone
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.sourcePill, stepSource === "ble" && s.sourcePillOn]}
+              onPress={async () => {
+                if (!connectedDevice) {
+                  Alert.alert(
+                    "No BLE Device",
+                    "Connect a fitness device first from Profile → Connected Devices.",
+                    [{ text: "OK" }]
+                  );
+                  return;
+                }
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                await setStepSource("ble");
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="bluetooth"
+                size={12}
+                color={stepSource === "ble" ? colors.onBrand : colors.onSurfaceSecondary}
+              />
+              <Text style={[s.sourcePillTxt, stepSource === "ble" && s.sourcePillTxtOn]}>
+                BLE Device
+              </Text>
+              {connectedDevice && (
+                <View style={[s.bleStatusDot, stepSource === "ble" && s.bleStatusDotOn]} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Live Heart Rate Band — shown when BLE device is connected */}
+        {connectedDevice && heartRate && (
+          <View style={s.hrBand}>
+            <View style={s.hrLeft}>
+              <View style={s.hrIconWrap}>
+                <View style={s.hrLiveDot} />
+                <Ionicons name="heart" size={18} color="#FF6B6B" />
+              </View>
+              <View>
+                <Text style={s.hrValue}>
+                  {heartRate}{" "}
+                  <Text style={s.hrUnit}>BPM</Text>
+                </Text>
+                <Text style={s.hrLabel}>HEART RATE</Text>
+              </View>
+            </View>
+            <View style={s.hrRight}>
+              <View style={s.hrLiveBadge}>
+                <Text style={s.hrLiveBadgeTxt}>● LIVE</Text>
+              </View>
+              <Text style={s.hrDevName} numberOfLines={1}>{connectedDevice.name}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Metric Grid */}
         <View style={s.grid}>
@@ -598,6 +725,76 @@ const s = StyleSheet.create({
   },
   pctValue: { fontFamily: fonts.display, fontSize: 22, color: colors.brand },
   pctLabel: { fontFamily: fonts.text, fontSize: 14, color: colors.onSurfaceSecondary },
+
+  // Source toggle
+  sourceToggle: {
+    flexDirection: "row",
+    marginTop: 14,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.pill,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 2,
+  },
+  sourcePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+  },
+  sourcePillOn: { backgroundColor: colors.brand },
+  sourcePillTxt: { fontFamily: fonts.textBold, fontSize: 12, color: colors.onSurfaceSecondary },
+  sourcePillTxtOn: { color: colors.onBrand },
+  bleStatusDot: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: colors.success, opacity: 0.6,
+  },
+  bleStatusDotOn: { opacity: 1 },
+
+  // Heart Rate Band
+  hrBand: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FF6B6B14",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#FF6B6B30",
+    padding: 14,
+    marginBottom: 12,
+  },
+  hrLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  hrIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: "#FF6B6B22",
+    alignItems: "center", justifyContent: "center",
+  },
+  hrLiveDot: {
+    position: "absolute", top: -1, right: -1, zIndex: 1,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: colors.success, borderWidth: 1.5, borderColor: colors.surface,
+  },
+  hrValue: { fontFamily: fonts.display, fontSize: 22, color: colors.onSurface },
+  hrUnit: { fontFamily: fonts.text, fontSize: 13, color: colors.onSurfaceSecondary },
+  hrLabel: {
+    fontFamily: fonts.textBold, fontSize: 9, color: colors.onSurfaceSecondary,
+    letterSpacing: 1.2, marginTop: 2,
+  },
+  hrRight: { alignItems: "flex-end", gap: 4 },
+  hrLiveBadge: {
+    paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: colors.success + "22",
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.success + "40",
+  },
+  hrLiveBadgeTxt: {
+    fontFamily: fonts.textBold, fontSize: 10, color: colors.success, letterSpacing: 0.5,
+  },
+  hrDevName: {
+    fontFamily: fonts.text, fontSize: 11, color: colors.onSurfaceSecondary, maxWidth: 120,
+  },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5, marginBottom: 16 },
   aiCard: {
     backgroundColor: colors.surfaceSecondary,

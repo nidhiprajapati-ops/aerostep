@@ -11,8 +11,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { colors, radius, fonts } from "@/src/theme";
 import { apiGet, apiPost, getDeviceId, Profile } from "@/src/api";
+import { useBLEContext } from "@/src/context/BLEContext";
 
 const GENDERS = [
   { key: "male", label: "Male" },
@@ -39,6 +41,7 @@ const HEALTH_CONDITIONS = [
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { connectedDevice, heartRate } = useBLEContext();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState("");
@@ -294,6 +297,44 @@ export default function ProfileScreen() {
         </View>
 
         {/* Save Button */}
+        {/* ─── Connected Devices Card ──────────────────────── */}
+        <Text style={s.sectionLabel}>CONNECTED DEVICES</Text>
+        <TouchableOpacity
+          style={s.devicesCard}
+          onPress={() => router.push("/devices")}
+          activeOpacity={0.8}
+        >
+          <View style={s.devicesLeft}>
+            <View style={[
+              s.devicesIconWrap,
+              connectedDevice && { backgroundColor: colors.brand + "22" },
+            ]}>
+              <Ionicons
+                name="bluetooth"
+                size={18}
+                color={connectedDevice ? colors.brand : colors.onSurfaceSecondary}
+              />
+              {connectedDevice && <View style={s.devConnDot} />}
+            </View>
+            <View>
+              {connectedDevice ? (
+                <>
+                  <Text style={s.devicesTitle} numberOfLines={1}>{connectedDevice.name}</Text>
+                  <Text style={s.devicesSub}>
+                    {heartRate ? `❤️  ${heartRate} BPM  •  ` : ""}Connected
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={s.devicesTitle}>No Device Connected</Text>
+                  <Text style={s.devicesSub}>Tap to scan for fitness bands</Text>
+                </>
+              )}
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderStrong} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[
             s.saveBtn,
@@ -392,6 +433,13 @@ const s = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 16,
   },
+  sectionLabel: {
+    fontFamily: fonts.textBold,
+    fontSize: 10,
+    color: colors.onSurfaceSecondary,
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
   field: { marginBottom: 20 },
   row2: { flexDirection: "row" },
   label: {
@@ -447,4 +495,29 @@ const s = StyleSheet.create({
     marginTop: 14,
     lineHeight: 18,
   },
+  // Connected Devices card
+  devicesCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 24,
+  },
+  devicesLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  devicesIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: colors.surfaceTertiary,
+    alignItems: "center", justifyContent: "center",
+  },
+  devConnDot: {
+    position: "absolute", top: -2, right: -2,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: colors.success, borderWidth: 1.5, borderColor: colors.surfaceSecondary,
+  },
+  devicesTitle: { fontFamily: fonts.textBold, fontSize: 14, color: colors.onSurface },
+  devicesSub: { fontFamily: fonts.text, fontSize: 12, color: colors.onSurfaceSecondary, marginTop: 2 },
 });

@@ -7,6 +7,9 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
+import { BLEProvider } from "@/src/context/BLEContext";
+// Register background step-sync task at app startup (no-op in Expo Go)
+import "@/src/tasks/backgroundStepTask";
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
@@ -42,8 +45,12 @@ export default function RootLayout() {
 
   return (
     <KeyboardProvider>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0A0A0C" } }} />
+      <BLEProvider>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0A0A0C" } }}>
+          <Stack.Screen name="devices" options={{ presentation: "modal" }} />
+        </Stack>
+      </BLEProvider>
     </KeyboardProvider>
   );
 }

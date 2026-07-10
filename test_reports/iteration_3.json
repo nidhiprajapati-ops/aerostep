@@ -1,0 +1,51 @@
+{
+  "summary": "BLE feature testing: Home source toggle, Profile connected devices card, Devices screen, backend source field. All 10 feature requirements verified. 12/12 backend tests passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_aerostep.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "NOTE: Tab bar Profile click via Playwright text selector navigates to 'Your Profile' text (hidden element) — use direct URL or coordinate click. Not a bug, Playwright limitation in React Native web.",
+    "NOTE: BLE features (scan/connect) intentionally unavailable in web/Expo Go — Devices screen correctly shows 'Native Build Required' card with Publish CTA as designed."
+  ],
+  "critical_code_review_comments": [
+    "home.tsx: stepSource toggle correctly shows 'STEPS TODAY' when source='phone' and 'BLE STEPS' when source='ble'",
+    "home.tsx: BLE Device pill tap when connectedDevice=null correctly fires Alert (not testable in web without triggering alert)",
+    "profile.tsx: CONNECTED DEVICES section renders with chevron, taps to router.push('/devices') — verified working",
+    "devices.tsx: router.back() returns to profile correctly when history exists (verified via profile→devices→back flow)",
+    "server.py: StepsIn.source field defaults to 'phone', accepts 'ble'; stores per-source fields (steps_phone, steps_ble) in MongoDB — verified"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_aerostep.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 tests passed)",
+    "frontend": "100% (all 10 feature requirements verified)"
+  },
+  "seed_data_creation": "TEST_device_aerostep_001 profile used from prior iteration",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "BLE features work correctly in web preview (graceful degradation). Source toggle Pills (Phone/BLE Device) visible on home screen below progress ring. Phone pill highlighted yellow by default. Profile CONNECTED DEVICES card navigates to /devices. Devices shows Native Build Required. Back button returns to Profile. Backend /api/steps accepts source field (phone|ble).",
+  "verified_requirements": {
+    "1_source_toggle_pills_on_home": "PASS - Phone and BLE Device pills render below progress ring",
+    "2_ble_pill_shows_alert_when_no_device": "PASS (code verified) - Alert fires when connectedDevice=null, pill renders correctly",
+    "3_phone_pill_default_active": "PASS - Phone pill highlighted in brand yellow by default",
+    "4_profile_connected_devices_section": "PASS - CONNECTED DEVICES section with No Device Connected card and chevron",
+    "5_connected_devices_navigates_to_devices": "PASS - Tapping card navigates to /devices route",
+    "6_devices_native_build_required": "PASS - Shows Native Build Required card with Publish CTA",
+    "7_back_button_returns_to_profile": "PASS - ← Profile back button returns to /profile",
+    "8_backend_steps_source_field": "PASS - POST /api/steps with source='phone' and source='ble' both return 200",
+    "9_backend_health_200": "PASS - GET /api/ returns 200",
+    "10_steps_today_label_phone_mode": "PASS - Ring label shows STEPS TODAY in Phone mode"
+  }
+}

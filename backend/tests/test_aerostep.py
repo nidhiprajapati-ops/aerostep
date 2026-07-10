@@ -86,6 +86,32 @@ class TestSteps:
         assert resp.status_code == 200
         assert resp.json()["steps"] == 1000
 
+    def test_post_steps_with_source_phone(self, session):
+        """New: source='phone' field accepted"""
+        resp = session.post(f"{BASE_URL}/api/steps", json={
+            "device_id": DEVICE_ID,
+            "date": TODAY,
+            "steps": 200,
+            "mode": "increment",
+            "source": "phone",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "steps" in data
+
+    def test_post_steps_with_source_ble(self, session):
+        """New: source='ble' with mode='set' accepted"""
+        resp = session.post(f"{BASE_URL}/api/steps", json={
+            "device_id": DEVICE_ID,
+            "date": TODAY,
+            "steps": 3000,
+            "mode": "set",
+            "source": "ble",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["steps"] == 3000
+
     def test_get_history_7d(self, session):
         resp = session.get(f"{BASE_URL}/api/steps/{DEVICE_ID}/history?days=7")
         assert resp.status_code == 200

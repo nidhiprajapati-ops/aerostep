@@ -96,7 +96,8 @@ class StepsIn(BaseModel):
     device_id: str
     date: str  # YYYY-MM-DD (client local date)
     steps: int = Field(ge=0, le=200000)
-    mode: str = "increment"  # increment | set
+    mode: str = "increment"   # increment | set
+    source: str = "phone"     # phone | ble
 
 
 class StepDay(BaseDocument):
@@ -238,16 +239,25 @@ async def get_profile(device_id: str):
 
 @api_router.post("/steps")
 async def upsert_steps(body: StepsIn):
+    source_field = f"steps_{body.source}"  # "steps_phone" or "steps_ble"
     if body.mode == "set":
         await db.step_days.update_one(
             {"device_id": body.device_id, "date": body.date},
-            {"$set": {"steps": body.steps, "updated_at": utcnow_iso()}},
+            {"$set": {
+                "steps": body.steps,
+                source_field: body.steps,
+                "last_source": body.source,
+                "updated_at": utcnow_iso(),
+            }},
             upsert=True,
         )
     else:
         await db.step_days.update_one(
             {"device_id": body.device_id, "date": body.date},
-            {"$inc": {"steps": body.steps}, "$set": {"updated_at": utcnow_iso()}},
+            {
+                "$inc": {"steps": body.steps, source_field: body.steps},
+                "$set": {"last_source": body.source, "updated_at": utcnow_iso()},
+            },
             upsert=True,
         )
     doc = await db.step_days.find_one({"device_id": body.device_id, "date": body.date})
