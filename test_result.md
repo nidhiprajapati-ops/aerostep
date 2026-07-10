@@ -277,22 +277,24 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: true
 
 test_plan:
   current_focus:
     - "App loads and shows loading spinner"
+    - "Initial routing fix - app boots to onboarding/home NOT devices screen"
     - "Onboarding screen - profile setup form"
     - "Home dashboard screen with progress ring"
     - "Stats screen with SVG bar chart"
     - "Awards screen with streak card and badge grid"
     - "Profile screen with editable form"
     - "Tab navigation between all 4 screens"
+    - "Backend health check and API endpoints"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "All 5 screens created: onboarding.tsx, home.tsx, stats.tsx, awards.tsx, profile.tsx. Backend was already complete from previous session. app.json updated with pedometer permissions (NSMotionUsageDescription for iOS, ACTIVITY_RECOGNITION for Android). Please test: 1) App loads and redirects to onboarding (first time) 2) Profile creation form works and saves to backend 3) Home dashboard shows step count ring and metric cards 4) Stats page shows bar chart 5) Awards page shows streak card and badges 6) Profile page shows pre-filled form with goals. Device ID is auto-generated and stored in AsyncStorage."
+    message: "Previous session fixed a critical routing regression where the app was booting to the devices.tsx screen instead of onboarding. The fix placed devices.tsx outside the root _layout.tsx stack explicit listing and the index.tsx redirects to onboarding (first time) or home. Please validate: 1) App boots to loading spinner then onboarding (NOT devices screen) 2) All screens work correctly 3) Backend endpoints are healthy. BLE features are not testable in web/Expo Go - skip BLE-specific tests. Device ID is auto-generated via AsyncStorage."
