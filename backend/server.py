@@ -165,13 +165,19 @@ async def get_profile_doc(device_id: str) -> Optional[Profile]:
 
 async def get_steps_map(device_id: str) -> dict:
     """Returns {date: total_steps} — used for achievements & streaks."""
-    docs = await db.step_days.find({"device_id": device_id}).to_list(2000)
+    docs = await db.step_days.find(
+        {"device_id": device_id},
+        {"date": 1, "steps": 1, "_id": 0}
+    ).to_list(2000)
     return {d["date"]: d.get("steps", 0) for d in docs}
 
 
 async def get_steps_map_full(device_id: str) -> dict:
     """Returns {date: {steps, steps_phone, steps_ble}} — used for history chart."""
-    docs = await db.step_days.find({"device_id": device_id}).to_list(2000)
+    docs = await db.step_days.find(
+        {"device_id": device_id},
+        {"date": 1, "steps": 1, "steps_phone": 1, "steps_ble": 1, "_id": 0}
+    ).to_list(2000)
     return {
         d["date"]: {
             "steps": d.get("steps", 0),
