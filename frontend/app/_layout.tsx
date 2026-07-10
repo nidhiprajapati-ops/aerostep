@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Font from "expo-font";
 import React, { useEffect } from "react";
 import { LogBox, Platform, View } from "react-native";
 import { useFonts } from "expo-font";
@@ -29,21 +30,28 @@ if (Platform.OS !== "web") {
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
-  const [fontsLoaded, fontsError] = useFonts(
-    // On web, custom fonts are handled by CSS — skip blocking load to prevent
-    // the app hanging on a blank white screen if Metro font assets are unavailable.
-    Platform.OS !== "web"
-      ? {
-          "BarlowCondensed-Bold": require("../assets/fonts/BarlowCondensed-Bold.ttf"),
-          "BarlowCondensed-SemiBold": require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
-          "Satoshi-Medium": require("../assets/fonts/Satoshi-Medium.ttf"),
-          "Satoshi-Bold": require("../assets/fonts/Satoshi-Bold.ttf"),
-        }
-      : {}
-  );
+  // FontDisplay.SWAP → CSS font-display:swap on web.
+  // Text renders immediately in a system fallback, then swaps to the custom
+  // font once the .ttf is downloaded. Eliminates FOIT on the web preview.
+  const [fontsLoaded, fontsError] = useFonts({
+    "BarlowCondensed-Bold": {
+      uri: require("../assets/fonts/BarlowCondensed-Bold.ttf"),
+      display: Font.FontDisplay.SWAP,
+    },
+    "BarlowCondensed-SemiBold": {
+      uri: require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
+      display: Font.FontDisplay.SWAP,
+    },
+    "Satoshi-Medium": {
+      uri: require("../assets/fonts/Satoshi-Medium.ttf"),
+      display: Font.FontDisplay.SWAP,
+    },
+    "Satoshi-Bold": {
+      uri: require("../assets/fonts/Satoshi-Bold.ttf"),
+      display: Font.FontDisplay.SWAP,
+    },
+  });
 
-  // On web, fonts resolve immediately (empty map → [true, null]).
-  // On native, wait for actual font loading.
   const iconsReady = loaded || !!error;
   const textReady = fontsLoaded || !!fontsError;
 
@@ -53,8 +61,10 @@ export default function RootLayout() {
     }
   }, [iconsReady, textReady]);
 
-  // Block render until fonts are ready (native only — web always passes above)
-  if (!iconsReady || !textReady) return null;
+  // On native: block until fonts are ready (splash screen covers the wait).
+  // On web: render immediately — fonts load via CSS and snap in when ready,
+  // blocking would cause a permanent blank screen if Metro can't serve the .ttf.
+  if (Platform.OS !== "web" && (!iconsReady || !textReady)) return null;
 
   return (
     <KeyboardProvider>
