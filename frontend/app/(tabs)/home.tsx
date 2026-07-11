@@ -21,7 +21,16 @@ import ProgressRing from "@/src/components/ProgressRing";
 import { usePedometer } from "@/src/hooks/usePedometer";
 import { useBLEContext } from "@/src/context/BLEContext";
 import { colors, radius, fonts } from "@/src/theme";
-import { apiGet, apiPost, getDeviceId, todayStr, Profile, DayMetrics } from "@/src/api";
+import {
+  apiGet,
+  apiPost,
+  getCachedProfile,
+  getDeviceId,
+  syncPendingProfile,
+  todayStr,
+  Profile,
+  DayMetrics,
+} from "@/src/api";
 
 interface AchieveSummary {
   current_streak: number;
@@ -118,6 +127,18 @@ export default function HomeScreen() {
     try {
       const deviceId = await getDeviceId();
       deviceIdRef.current = deviceId;
+      const cachedProfile = await getCachedProfile(deviceId);
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        goalRef.current = cachedProfile.step_goal;
+        setLoading(false);
+      }
+      syncPendingProfile().then((saved) => {
+        if (saved) {
+          setProfile(saved);
+          goalRef.current = saved.step_goal;
+        }
+      }).catch(() => {});
       const today = todayStr();
       const [pRes, mRes, aRes] = await Promise.allSettled([
         apiGet<Profile>(`/profile/${deviceId}`),

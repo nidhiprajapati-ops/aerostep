@@ -15,7 +15,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { colors, radius, fonts } from "@/src/theme";
-import { apiGet, apiPost, getDeviceId, Profile } from "@/src/api";
+import {
+  apiGet,
+  getCachedProfile,
+  getDeviceId,
+  Profile,
+  saveProfileLocally,
+  syncPendingProfile,
+} from "@/src/api";
 import { useBLEContext } from "@/src/context/BLEContext";
 
 const GENDERS = [
@@ -60,6 +67,18 @@ export default function ProfileScreen() {
   const loadProfile = useCallback(async () => {
     try {
       const deviceId = await getDeviceId();
+      const cached = await getCachedProfile(deviceId);
+      if (cached) {
+        setProfile(cached);
+        setName(cached.name);
+        setGender(cached.gender);
+        setAge(String(cached.age));
+        setWeight(String(cached.weight_kg));
+        setHeight(String(cached.height_cm));
+        setActivity(cached.activity_level);
+        setConditions(cached.health_conditions ?? []);
+        setLoading(false);
+      }
       const p = await apiGet<Profile>(`/profile/${deviceId}`);
       setProfile(p);
       setName(p.name);
@@ -94,7 +113,7 @@ export default function ProfileScreen() {
     setSavedOk(false);
     try {
       const deviceId = await getDeviceId();
-      const updated = await apiPost<Profile>("/profile", {
+      const updated = await saveProfileLocally({
         device_id: deviceId,
         name: name.trim(),
         gender,
@@ -106,6 +125,9 @@ export default function ProfileScreen() {
       });
       setProfile(updated);
       setSavedOk(true);
+      syncPendingProfile().then((saved) => {
+        if (saved) setProfile(saved);
+      }).catch(() => {});
       setTimeout(() => setSavedOk(false), 2500);
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save.");

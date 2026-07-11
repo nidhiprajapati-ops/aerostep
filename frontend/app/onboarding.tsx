@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, fonts } from "@/src/theme";
-import { apiPost, apiGet, getDeviceId } from "@/src/api";
+import { apiGet, getDeviceId, saveProfileLocally, syncPendingProfile } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 
 const GENDERS = [
@@ -80,10 +80,7 @@ export default function OnboardingScreen() {
     setSaving(true);
     try {
       const deviceId = deviceIdRef.current || await getDeviceId();
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      try {
-        await apiPost("/profile", {
+      await saveProfileLocally({
         device_id: deviceId,
         name: name.trim(),
         gender,
@@ -91,16 +88,13 @@ export default function OnboardingScreen() {
         weight_kg: weightNum,
         height_cm: heightNum,
         activity_level: activity,
-          health_conditions: conditions,
-        }, controller.signal);
-      } finally {
-        clearTimeout(timer);
-      }
+        health_conditions: conditions,
+      });
       await storage.setItem("profile_complete", true);
       router.replace("/(tabs)/home");
+      syncPendingProfile().catch(() => {});
     } catch (e: any) {
-      const timedOut = e?.name === "AbortError";
-      setError(timedOut ? "Saving timed out. Check your connection and try again." : e.message || "Failed to save. Please try again.");
+      setError(e.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }

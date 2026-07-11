@@ -1,0 +1,49 @@
+{
+  "summary": "Validated backend + frontend for offline-first onboarding resilience and online persistence. Create My Profile now navigates promptly to Home even when all /api calls are unreachable, and online creation still persists correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Profile screen pill/buttons",
+        "issue": "Several interactive TouchableOpacity elements on Profile screen do not expose testID (gender/activity/conditions/device card), reducing automated test coverage reliability.",
+        "testID": "missing",
+        "priority": "medium"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_profile_resilience_online.py",
+    "/app/test_reports/pytest/pytest_profile_resilience_online.xml",
+    "/app/test_reports/iteration_14_offline_profile.jpeg",
+    "/app/test_reports/iteration_14_online_profile.jpeg"
+  ],
+  "action_items": [
+    "Add missing testID attributes to interactive Profile screen controls to improve deterministic mobile automation.",
+    "Investigate recurring Expo console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'.",
+    "Investigate one non-blocking frontend resource 404 seen during online flow; identify missing asset/request source."
+  ],
+  "critical_code_review_comments": [
+    "Offline-first implementation is correct for onboarding critical path: local save + immediate router.replace('/(tabs)/home') + non-blocking syncPendingProfile().",
+    "API sync retry is asynchronous and non-blocking from Home/Profile via syncPendingProfile(), matching resilience requirement.",
+    "Backend profile endpoint persists and returns normalized profile data without Mongo _id leakage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_profile_resilience_online.py",
+    "/app/test_reports/iteration_14.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Created TEST_resilience_* backend profile records via API tests and generated web device profiles (Offline Profile, Online Persist) during UI validation.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified on public preview URL. Offline onboarding with intercepted /api reached Home in ~125ms; blocked profile POST observed asynchronously; no 'Saving timed out' message displayed; Profile tab loaded cached data while offline. Online onboarding captured POST /api/profile device_id and verified persistence via GET /api/profile/{device_id} == true.",
+  "rca_of_issue": "Root cause from prior runs: native backend host can be unreachable (internal 10.x/private route), causing old blocking save behavior. Current mitigation works: onboarding no longer depends on immediate backend success. Reproduction in this run by aborting all /api requests still allowed immediate Home navigation and later async sync attempts without timeout UI block."
+}

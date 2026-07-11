@@ -214,7 +214,7 @@ frontend:
     file: "frontend/app/onboarding.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
@@ -225,6 +225,9 @@ frontend:
       - working: true
         agent: "testing"
         comment: "Verified Create My Profile navigates to Home in approximately 0.14–0.74 seconds with no indefinite saving state."
+      - working: false
+        agent: "user"
+        comment: "User reported native submission still timed out. Backend logs contained no matching POST, confirming the device could not reach the configured internal hostname."
 
   - task: "Home dashboard screen with progress ring"
     implemented: true
@@ -294,6 +297,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Create My Profile succeeds when backend is unreachable"
     - "Create My Profile submission speed and successful navigation"
     - "App loads and shows loading spinner - then navigates to onboarding"
     - "Onboarding screen renders and form submission works"
