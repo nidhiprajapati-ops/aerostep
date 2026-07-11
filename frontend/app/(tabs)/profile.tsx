@@ -222,6 +222,7 @@ export default function ProfileScreen() {
                 key={g.key}
                 style={[s.pill, gender === g.key && s.pillOn]}
                 onPress={() => setGender(g.key)}
+                testID={`profile-gender-${g.key}`}
               >
                 <Text style={[s.pillTxt, gender === g.key && s.pillTxtOn]}>
                   {g.label}
@@ -284,6 +285,7 @@ export default function ProfileScreen() {
                 key={a.key}
                 style={[s.pill, s.pillMd, activity === a.key && s.pillOn]}
                 onPress={() => setActivity(a.key)}
+                testID={`profile-activity-${a.key}`}
               >
                 <Text style={[s.pillTxt, activity === a.key && s.pillTxtOn]}>
                   {a.label}
@@ -302,6 +304,7 @@ export default function ProfileScreen() {
                 key={c.key}
                 style={[s.pill, s.pillMd, conditions.includes(c.key) && s.pillOn]}
                 onPress={() => toggleCondition(c.key)}
+                testID={`profile-condition-${c.key}`}
               >
                 {conditions.includes(c.key) && (
                   <Ionicons
@@ -331,6 +334,7 @@ export default function ProfileScreen() {
           style={s.devicesCard}
           onPress={() => router.push("/devices")}
           activeOpacity={0.8}
+          testID="profile-connected-devices"
         >
           <View style={s.devicesLeft}>
             <View style={[

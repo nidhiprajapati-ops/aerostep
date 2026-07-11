@@ -6,13 +6,15 @@ import React from 'react';
 import { ScrollView, ScrollViewProps } from 'react-native';
 
 let KeyboardScrollViewImpl: React.ComponentType<ScrollViewProps & { bottomOffset?: number }>;
+function FallbackKeyboardScrollView({ bottomOffset: _bottomOffset, ...rest }: ScrollViewProps & { bottomOffset?: number }) {
+  return <ScrollView {...rest} />;
+}
+
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   KeyboardScrollViewImpl = require('react-native-keyboard-controller').KeyboardAwareScrollView;
 } catch {
-  KeyboardScrollViewImpl = ({ bottomOffset, ...rest }: ScrollViewProps & { bottomOffset?: number }) => (
-    <ScrollView {...rest} />
-  );
+  KeyboardScrollViewImpl = FallbackKeyboardScrollView;
 }
 
 export const KeyboardScrollView = KeyboardScrollViewImpl;

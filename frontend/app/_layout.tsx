@@ -19,19 +19,20 @@ SplashScreen.preventAutoHideAsync();
 // react-native-keyboard-controller has no web support, and its native module
 // isn't linked in Expo Go either — both throw at require() time, so fall back
 // to a passthrough view rather than crashing the whole tree on either.
+function PassthroughKeyboardProvider({ children }: { children: React.ReactNode }) {
+  return <View style={{ flex: 1 }}>{children}</View>;
+}
+
 let KeyboardProvider: React.ComponentType<{ children: React.ReactNode }>;
 if (Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     KeyboardProvider = require("react-native-keyboard-controller").KeyboardProvider;
   } catch {
-    KeyboardProvider = ({ children }: { children: React.ReactNode }) => (
-      <View style={{ flex: 1 }}>{children}</View>
-    );
+    KeyboardProvider = PassthroughKeyboardProvider;
   }
 } else {
-  KeyboardProvider = ({ children }: { children: React.ReactNode }) => (
-    <View style={{ flex: 1 }}>{children}</View>
-  );
+  KeyboardProvider = PassthroughKeyboardProvider;
 }
 
 export default function RootLayout() {

@@ -141,7 +141,9 @@ export default function HomeScreen() {
       }).catch(() => {});
       const today = todayStr();
       const [pRes, mRes, aRes] = await Promise.allSettled([
-        apiGet<Profile>(`/profile/${deviceId}`),
+        cachedProfile
+          ? Promise.resolve(cachedProfile)
+          : apiGet<Profile>(`/profile/${deviceId}`),
         apiGet<DayMetrics>(`/steps/${deviceId}/day/${today}`),
         apiGet<AchieveSummary>(`/achievements/${deviceId}`),
       ]);

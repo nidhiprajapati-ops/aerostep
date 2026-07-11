@@ -91,8 +91,8 @@ export default function OnboardingScreen() {
         health_conditions: conditions,
       });
       await storage.setItem("profile_complete", true);
-      router.replace("/(tabs)/home");
       syncPendingProfile().catch(() => {});
+      router.replace("/(tabs)/home");
     } catch (e: any) {
       setError(e.message || "Failed to save. Please try again.");
     } finally {

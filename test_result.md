@@ -214,7 +214,7 @@ frontend:
     file: "frontend/app/onboarding.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -228,6 +228,9 @@ frontend:
       - working: false
         agent: "user"
         comment: "User reported native submission still timed out. Backend logs contained no matching POST, confirming the device could not reach the configured internal hostname."
+      - working: true
+        agent: "testing"
+        comment: "Offline-first fix verified with all API requests blocked: Home opened in ~125ms, cached profile loaded, and asynchronous sync was attempted without showing a timeout. Online persistence also passed."
 
   - task: "Home dashboard screen with progress ring"
     implemented: true
@@ -316,3 +319,5 @@ agent_communication:
     message: "Fixed 3 critical issues: 1) react-native-keyboard-controller has no web support causing blank screen - fixed by replacing KeyboardProvider with platform-conditional View on web, and replacing KeyboardAwareScrollView with native ScrollView+KeyboardAvoidingView in onboarding.tsx and profile.tsx. 2) Custom font loading on web was blocking render indefinitely - fixed by only loading custom fonts on native (not web). 3) Added missing Ionicons import that was accidentally removed. App name changed to 'FitPace' in app.json. Screenshots confirm onboarding is now rendering on web. Test all screens end-to-end."
   - agent: "testing"
     message: "Iteration 13 passed: profile submission is prompt, persists correctly, navigates to Home, and has bounded saving behavior."
+  - agent: "testing"
+    message: "Iteration 14 passed: Create My Profile is resilient when the backend is unreachable and still persists normally when online."
