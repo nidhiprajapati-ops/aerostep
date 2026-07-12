@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(supervisorctl status *)",
+      "Read(//var/log/**)",
+      "Bash(find / -maxdepth 4 -iname \"*supervisor*\" -type d)",
+      "Read(//etc/supervisor/conf.d/**)",
+      "Bash(grep -rn \"assets\\\\|rewrite\\\\|proxy_pass\\\\|location\" /etc/nginx/*.conf /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/* 2>/dev/null | grep -v \"^Binary\")",
+      "Read(//etc/nginx/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/assets/assets/fonts/BarlowCondensed-Bold.ttf?platform=web\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/assets/./assets/fonts/BarlowCondensed-Bold.ttf?platform=web\")",
+      "Bash(curl -s \"http://localhost:3000/assets/assets/fonts/BarlowCondensed-Bold.ttf?platform=web\")",
+      "Bash(curl -s \"http://localhost:3000/status\")",
+      "Bash(curl -s \"http://localhost:3000/assets/fonts/BarlowCondensed-Bold.ttf?platform=ios\" -w \"\\\\nHTTP:%{http_code}\\\\n\")",
+      "Bash(supervisorctl restart *)",
+      "Bash(time curl -s -o /dev/null -w 'HTTP:%{http_code} time:%{time_total}s\\\\n' -X POST http://localhost:8001/api/profile -H 'Content-Type: application/json' -d '{\"device_id\":\"perf-test-device\",\"name\":\"Test\",\"gender\":\"male\",\"age\":30,\"weight_kg\":70,\"height_cm\":175,\"activity_level\":\"moderate\",\"health_conditions\":[]}')",
+      "Bash(time curl -s -o /dev/null -w 'HTTP:%{http_code} time:%{time_total}s\\\\n' -X POST https://fitpace-10.internal.preview.emergentagent.com/api/profile -H 'Content-Type: application/json' -d '{\"device_id\":\"perf-test-device2\",\"name\":\"Test\",\"gender\":\"male\",\"age\":30,\"weight_kg\":70,\"height_cm\":175,\"activity_level\":\"moderate\",\"health_conditions\":[]}')",
+      "Bash(time curl -s -w '\\\\nHTTP:%{http_code} time:%{time_total}s\\\\n' -X POST http://localhost:8001/api/ai/coach -H 'Content-Type: application/json' -d '{\"device_id\":\"perf-test-device\",\"date\":\"2026-07-10\",\"refresh\":false}')"
+    ]
+  }
+}
