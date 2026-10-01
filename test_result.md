@@ -196,6 +196,17 @@ backend:
         comment: "Uses Emergent LLM key with gpt-5.4 to generate 3 personalized tips. Caches per device+date."
 
 frontend:
+  - task: "Expo SDK 57 upgrade"
+    implemented: true
+    working: "NA"
+    file: "frontend/package.json"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Upgraded Expo 54 to Expo 57.0.26, React Native 0.86.3, React 19.2.3, Router 57.0.24, and all Expo/native dependencies. Expo Doctor passes 21/21, TypeScript and lint pass, Android JS and web exports pass, and runtime preview renders."
   - task: "App loads and shows loading spinner"
     implemented: true
     working: "NA"
@@ -300,6 +311,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Expo SDK 57 runtime and navigation regression"
     - "Create My Profile succeeds when backend is unreachable"
     - "Create My Profile submission speed and successful navigation"
     - "App loads and shows loading spinner - then navigates to onboarding"

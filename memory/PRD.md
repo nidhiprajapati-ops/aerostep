@@ -59,7 +59,7 @@ Dark-first iOS SaaS fitness tracker with native pedometer, BLE device integratio
 ---
 
 ## Tech Stack
-- **Frontend**: Expo SDK 54, React Native, expo-router (file-based routing)
+- **Frontend**: Expo SDK 57, React Native 0.86, expo-router (file-based routing)
 - **Backend**: FastAPI + MongoDB
 - **AI**: OpenAI `gpt-4o` via `emergentintegrations`
 - **BLE**: `react-native-ble-plx` v3.5.1
@@ -97,3 +97,4 @@ ai_tips:     { device_id, date, tip }
 - Background step task requires native build
 - BLE step counting is cadence-estimated (not a true cumulative step counter unless device exposes a proprietary step characteristic)
 - Garmin/Fitbit proprietary protocols not supported (standard BLE only)
+- Local Android Hermes bytecode export is unavailable in the ARM64 workspace because Expo ships an x86-64 compiler; JavaScript bundle export passes and native build workers compile bytecode normally
